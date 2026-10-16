@@ -17,9 +17,9 @@ import {
 } from 'three';
 import type { PaletteName } from '../../shared/protocol.js';
 import { PALETTE, SWATCHES } from '../blocks/palette.js';
-import { DESK_HALF_D } from '../scene/desk.js';
+import { deskHalfD } from '../scene/desk.js';
 
-export type DockAction = 'mic' | 'undo' | 'redo' | 'magic' | 'export' | 'recenter' | `swatch:${PaletteName}`;
+export type DockAction = 'mic' | 'undo' | 'redo' | 'magic' | 'export' | 'grid' | 'recenter' | `swatch:${PaletteName}`;
 
 interface Button {
   id: DockAction;
@@ -34,7 +34,11 @@ interface Button {
 }
 
 const BUTTON_Y = 0.008;
-const ROW_Z = DESK_HALF_D + 0.055;
+let ROW_Z = deskHalfD() + 0.055;
+/** Re-seat the dock after a grid preset changes desk depth. */
+export function reseatDockZ(): void {
+  ROW_Z = deskHalfD() + 0.055;
+}
 
 export class Dock {
   readonly root = new Group();
@@ -52,6 +56,7 @@ export class Dock {
       ...SWATCHES.map((s) => [`swatch:${s}`, small] as [DockAction, number]),
       ['magic', big],
       ['export', 0.018],
+      ['grid', 0.018],
       ['recenter', big],
     ];
     const gap = 0.012;
@@ -227,6 +232,12 @@ function iconTexture(id: DockAction): CanvasTexture {
       g.beginPath(); g.moveTo(64, 18); g.lineTo(64, 78); g.stroke();
       g.beginPath(); g.moveTo(42, 58); g.lineTo(64, 80); g.lineTo(86, 58); g.stroke();
       g.beginPath(); g.roundRect(28, 92, 72, 22, 6); g.stroke();
+      break;
+    case 'grid':
+      // Nested squares = block / grid size
+      g.strokeRect(24, 24, 80, 80);
+      g.strokeRect(44, 44, 40, 40);
+      g.strokeRect(58, 58, 12, 12);
       break;
     case 'recenter':
       g.beginPath(); g.arc(64, 64, 30, 0, Math.PI * 2); g.stroke();

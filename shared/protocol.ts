@@ -47,8 +47,12 @@ export const COMMAND_TYPES = [
   'scale',
   'rotate',
   'export',
+  'grid',
 ] as const;
 export type CommandType = (typeof COMMAND_TYPES)[number];
+
+export const GRID_PRESET_IDS = ['draft', 'studio', 'detail', 'fine', 'mosaic'] as const;
+export type GridPresetId = (typeof GRID_PRESET_IDS)[number];
 
 export interface BuildCommand {
   v: 1;
@@ -68,6 +72,8 @@ export interface BuildCommand {
   dz?: number;
   /** rotate: quarter turns clockwise seen from above (default 1) */
   turns?: number;
+  /** grid: which block-size preset to switch to */
+  preset?: GridPresetId;
   message?: string;
   ts?: number;
 }
@@ -131,6 +137,13 @@ export function sanitizeCommand(raw: unknown): BuildCommand | null {
   }
   if (typeof raw.message === 'string') cmd.message = raw.message.slice(0, 160);
   if (typeof raw.ts === 'number') cmd.ts = raw.ts;
+  if (type === 'grid') {
+    const p = raw.preset;
+    if (typeof p === 'string' && (GRID_PRESET_IDS as readonly string[]).includes(p)) {
+      cmd.preset = p as GridPresetId;
+    }
+    // grid without preset = cycle to next
+  }
   return cmd;
 }
 

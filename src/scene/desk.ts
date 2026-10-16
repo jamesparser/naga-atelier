@@ -22,8 +22,19 @@ import {
 } from 'three';
 import { CELL, GRID_X, GRID_Z, X_MAX, X_MIN, Z_MAX, Z_MIN } from '../config.js';
 
-export const DESK_HALF_W = (GRID_X * CELL) / 2;
-export const DESK_HALF_D = (GRID_Z * CELL) / 2;
+/** Live desk half-extents (grid presets can change CELL / GRID_* at runtime). */
+export function deskHalfW(): number {
+  return (GRID_X * CELL) / 2;
+}
+export function deskHalfD(): number {
+  return (GRID_Z * CELL) / 2;
+}
+/** @deprecated prefer deskHalfW()/deskHalfD(); kept for call sites loaded at start. */
+export const DESK_HALF_W = (16 * 0.04) / 2;
+export const DESK_HALF_D = (12 * 0.04) / 2;
+export function trashPos(): Vector3 {
+  return new Vector3(deskHalfW() + 0.075, 0, 0.02);
+}
 export const TRASH_POS = new Vector3(DESK_HALF_W + 0.075, 0, 0.02);
 export const TRASH_RADIUS = 0.055;
 

@@ -15,7 +15,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { DEBUG, DESK_BELOW_HEAD, DESK_FORWARD, LOW_FX, QUERY, CELL } from './config.js';
+import { DEBUG, DESK_BELOW_HEAD, DESK_FORWARD, LOW_FX, QUERY, CELL, GRID_PRESETS, GRID_PRESET_ID, applyGridPreset, nextGridPreset } from './config.js';
 import { sanitizeCommand, BLUEPRINT_IDS, type AgentEnvelope, type BuildCommand, type BlueprintId } from '../shared/protocol.js';
 import { VoxelModel, key } from './blocks/voxelModel.js';
 import { VoxelRenderer } from './blocks/voxelRenderer.js';
@@ -154,6 +154,17 @@ function start(): void {
       say('Saved your desk as HTML.');
       return { ok: true, speech: 'Saved your desk as HTML.' };
     }
+    if (cmd.type === 'grid') {
+      const next = cmd.preset ? applyGridPreset(cmd.preset) : nextGridPreset();
+      sfx.play('chime');
+      // Block geometry / desk size are built at session start — reload cleanly.
+      const url = new URL(location.href);
+      url.searchParams.set('grid', next.id);
+      url.searchParams.set('fresh', '1');
+      say(`${next.label}. Clearing the desk and reloading…`);
+      setTimeout(() => location.assign(url.toString()), 700);
+      return { ok: true, speech: next.blurb };
+    }
     const res = executeCommand(model, cmd);
     const now = performance.now();
     if (res.spawn) {
@@ -270,6 +281,10 @@ function start(): void {
         sfx.play('chime');
         say('Saved your desk as HTML.');
         break;
+      case 'grid':
+        interaction.cancelAll();
+        apply({ v: 1, type: 'grid' });
+        break;
       case 'recenter':
         sfx.play('click');
         placeDeskNextFrame = true;
@@ -313,6 +328,26 @@ function start(): void {
   const micBtn = document.getElementById('mic') as HTMLButtonElement;
   const statusEl = document.getElementById('status')!;
   const landing = document.getElementById('landing')!;
+
+  // Landing-page block-size picker (?grid= already applied at module load)
+  {
+    const holder = document.getElementById('grid-options');
+    if (holder) {
+      for (const p of GRID_PRESETS) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = p.id === GRID_PRESET_ID ? 'active' : '';
+        b.innerHTML = `${p.label}<small>${p.blurb}</small>`;
+        b.addEventListener('click', () => {
+          const url = new URL(location.href);
+          url.searchParams.set('grid', p.id);
+          url.searchParams.set('fresh', '1');
+          location.assign(url.toString());
+        });
+        holder.appendChild(b);
+      }
+    }
+  }
   let xrMode: XRSessionMode | null = null;
   let session: XRSession | null = null;
   let firstSession = true;

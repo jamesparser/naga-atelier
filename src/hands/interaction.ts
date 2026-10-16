@@ -11,7 +11,7 @@
  * Hands always win: agent commands cancel nothing the user is holding until it is dropped.
  */
 import { Vector3, type Object3D } from 'three';
-import { CARRY_LIFT, DRAG_THRESHOLD, GRAB_RADIUS, GRID_Y, HOLD_DETACH_MS } from '../config.js';
+import { CARRY_LIFT, DRAG_THRESHOLD, GRID_Y, HOLD_DETACH_MS, grabRadius } from '../config.js';
 import { sfx } from '../audio/sfx.js';
 import { CarryMesh, GhostMesh, cellAt, cellCenter, type VoxelRenderer } from '../blocks/voxelRenderer.js';
 import { groupOf, inBounds, key, parseKey, type Cell, type CellChange, type VoxelModel } from '../blocks/voxelModel.js';
@@ -202,7 +202,7 @@ export class Interaction {
   private pick(local: Vector3, radiusScale = 1): string | null {
     const [cx, cy, cz] = cellAt(local);
     let best: string | null = null;
-    let bestD = GRAB_RADIUS * radiusScale;
+    let bestD = grabRadius() * radiusScale;
     const c = new Vector3();
     for (let dx = -1; dx <= 1; dx++)
       for (let dy = -1; dy <= 1; dy++)

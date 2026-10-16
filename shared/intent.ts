@@ -120,6 +120,25 @@ export function parseIntent(raw: string): AgentEnvelope | null {
       type: 'export',
     });
   }
+  // --- grid / block size -----------------------------------------------
+  if (/\b(12\s*(?:[x×]|by)\s*12|draft grid|draft mode|big blocks|bigger blocks|coarse|easy blocks)\b/.test(t)) {
+    return envelope('Switching to draft — big 12 by 12 blocks.', { v: 1, type: 'grid', preset: 'draft' });
+  }
+  if (/\b(16\s*(?:[x×]|by)\s*12|studio|default (grid|blocks)|normal blocks)\b/.test(t)) {
+    return envelope('Studio grid — balanced blocks.', { v: 1, type: 'grid', preset: 'studio' });
+  }
+  if (/\b(24\s*(?:[x×]|by)\s*24|detail grid|detail mode|more detail|smaller blocks|fine blocks|finer)\b/.test(t)) {
+    return envelope('Detail grid — smaller 24 by 24 blocks.', { v: 1, type: 'grid', preset: 'detail' });
+  }
+  if (/\b(48\s*(?:[x×]|by)\s*48|fine grid|fine mode|tiny blocks)\b/.test(t)) {
+    return envelope('Fine grid — 48 by 48 tiny blocks.', { v: 1, type: 'grid', preset: 'fine' });
+  }
+  if (/\b(64\s*(?:[x×]|by)\s*64|mosaic|maximum detail|smallest blocks)\b/.test(t)) {
+    return envelope('Mosaic grid — 64 by 64, the finest hands can use.', { v: 1, type: 'grid', preset: 'mosaic' });
+  }
+  if (/\b(next grid|change (grid|block size)|cycle (grid|blocks)|block size)\b/.test(t)) {
+    return envelope('Cycling block size.', { v: 1, type: 'grid' });
+  }
 
   const blueprint = findBlueprint(t);
   const color = findColor(t);

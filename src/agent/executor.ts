@@ -29,6 +29,9 @@ export function executeCommand(model: VoxelModel, cmd: BuildCommand): ExecResult
     case 'export':
       // Client-side side effect (download). Nothing to mutate in the model.
       return { ok: true };
+    case 'grid':
+      // Client rebuilds desk/renderer for the new block size. Model is cleared there.
+      return { ok: true };
     case 'clear': {
       if (model.size === 0) return { ok: true, speech: 'The desk is already clear.' };
       model.commit('clear', model.diff([...model.cells.keys()].map((k) => [k, null])), null);
