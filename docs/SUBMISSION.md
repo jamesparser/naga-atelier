@@ -7,7 +7,7 @@
 | Name | Naga Atelier |
 | Tagline (≤140) | Talk it into the room. Sculpt it with your hands. |
 | Track / Division | Productivity · New Experience |
-| Build URL | `https://<production-url>` (WebXR, opens in Quest Browser) |
+| Build URL | https://naga-atelier.vercel.app (WebXR, opens in Quest Browser) |
 | Video | `<YouTube/Vimeo, public, < 3:00>` |
 | Repo | public mirror of this repository |
 

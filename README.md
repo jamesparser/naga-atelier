@@ -11,6 +11,8 @@ Then you fix it with your hands: pinch, slide, snap, tap, drop it in the bin, un
 
 Built for the Meta VR Start Developer Competition 2026 (Productivity track, New Experience division).
 
+**Try it:** open **https://naga-atelier.vercel.app** in Quest Browser on a Quest 3 / 3S.
+
 ## The 60-second loop
 
 1. Open the URL in Quest Browser and tap **Enter**. Passthrough fades in and a build grid sits on your desk.
