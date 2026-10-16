@@ -6,8 +6,8 @@ import { BIRD, createLevelBodies, createWorld } from '../src/game/slingPhysics';
 const step = (w: CANNON.World, s: number) => { for (let i = 0; i < s * 60; i++) w.step(1 / 60); };
 
 describe('sling levels', () => {
-  it('has 6 levels with birds and targets', () => {
-    expect(LEVELS.length).toBe(6);
+  it('has 12 levels with birds and targets', () => {
+    expect(LEVELS.length).toBe(12);
     for (const l of LEVELS) {
       expect(l.birds.length).toBeGreaterThanOrEqual(3);
       expect(l.targets.length).toBeGreaterThanOrEqual(2);

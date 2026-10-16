@@ -28,6 +28,31 @@ export type DockAction =
   // mode bar
   | 'build' | 'sling';
 
+/** What every button says: short label printed under it, longer text in the hover tooltip. */
+export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
+  mic: ['VOICE', 'Talk to Naga (tap, then speak)'],
+  undo: ['UNDO', 'Undo last change'],
+  redo: ['REDO', 'Redo'],
+  magic: ['SURPRISE', 'Build a surprise shape'],
+  export: ['SAVE', 'Save your desk as a web page'],
+  grid: ['BLOCK SIZE', 'Change block size (clears desk)'],
+  recenter: ['RECENTER', 'Move the desk in front of you'],
+  game: ['TETRIS', 'Play 3D Tetris'],
+  sling: ['ANGRY SLING', 'Play Angry Sling'],
+  build: ['BUILD', 'Back to building'],
+  exit: ['BACK', 'Back to building'],
+  spin: ['SPIN', 'Spin the piece (turn flat)'],
+  flip: ['FLIP', 'Flip the piece toward you'],
+  tilt: ['TILT', 'Tilt the piece sideways'],
+  drop: ['DROP', 'Drop the piece now (or play again)'],
+  pause: ['PAUSE', 'Pause / resume'],
+  retry: ['RETRY', 'Restart this level'],
+  next: ['NEXT LEVEL', 'Skip to the next level'],
+  turnL: ['TURN LEFT', 'Turn the arena left'],
+  turnR: ['TURN RIGHT', 'Turn the arena right'],
+  zoom: ['ZOOM', 'Bigger / smaller arena'],
+};
+
 const BIG = 0.024;
 const SMALL = 0.0145;
 
@@ -97,6 +122,7 @@ export class Dock {
   private activeSwatch: PaletteName = 'oak';
   private selected: DockAction | null = null;
   private micState: 'idle' | 'listening' | 'thinking' | 'off' = 'idle';
+  private tooltip!: Mesh & { userData: { text?: string; draw?: (t: string) => void } };
 
   /** `column`: lay the buttons out front-to-back at this desk-local x instead of along the front edge. */
   constructor(layout: Array<[DockAction, number]> = BUILD_LAYOUT, column?: { x: number; zFront: number; labels?: Partial<Record<DockAction, string>> }) {
@@ -109,19 +135,30 @@ export class Dock {
       if (column) {
         z -= r;
         this.buttons.push(this.makeButton(id, r, new Vector3(column.x, 0, z)));
-        const text = column.labels?.[id];
+        const text = column.labels?.[id] ?? DOCK_LABELS[id]?.[0];
         if (text) {
-          const lab = labelMesh(text);
-          lab.position.set(column.x - r - 0.034, 0.002, z);
+          const lab = labelMesh(text, 'right');
+          lab.position.set(column.x - r - 0.036, 0.002, z);
           this.root.add(lab);
         }
         z -= r + gap;
         continue;
       }
       x += r;
-      this.buttons.push(this.makeButton(id, r, new Vector3(x, 0, ROW_Z + (r === SMALL ? -0.006 : 0))));
+      const pos = new Vector3(x, 0, ROW_Z + (r === SMALL ? -0.006 : 0));
+      this.buttons.push(this.makeButton(id, r, pos));
+      const text = DOCK_LABELS[id]?.[0];
+      if (text) {
+        // printed on the desk just in front of the button, readable from the seat
+        const lab = labelMesh(text, 'center', Math.max(2 * r + gap, 0.05));
+        lab.position.set(x, 0.0015, pos.z + r + 0.011);
+        this.root.add(lab);
+      }
       x += r + gap;
     }
+    this.tooltip = tooltipMesh();
+    this.tooltip.visible = false;
+    this.root.add(this.tooltip);
     this.setActiveSwatch('oak');
   }
 
@@ -193,10 +230,16 @@ export class Dock {
    * Poke detection. `tips` are index fingertips in desk-local space keyed by hand id.
    * Returns buttons that were pressed this frame (edge-triggered, re-armed on lift).
    */
-  updatePokes(tips: Map<number, Vector3>, now: number): DockAction[] {
+  updatePokes(tips: Map<number, Vector3>, now: number, hoverPoints: Vector3[] = []): DockAction[] {
     const out: DockAction[] = [];
+    let tipFor: Button | null = null;
+    let tipD = Infinity;
     for (const b of this.buttons) {
       let hovered = false;
+      for (const hp of hoverPoints) {
+        const d = Math.hypot(hp.x - b.root.position.x, hp.z - b.root.position.z);
+        if (d < b.radius + 0.008 && hp.y < 0.09 && hp.y > -0.03) hovered = true;
+      }
       for (const [hid, tip] of tips) {
         const d = Math.hypot(tip.x - b.root.position.x, tip.z - b.root.position.z);
         const inside = d < b.radius + 0.004 && tip.y < BUTTON_Y + 0.008 && tip.y > -0.03;
@@ -214,8 +257,36 @@ export class Dock {
       }
       for (const hid of [...b.armed.keys()]) if (!tips.has(hid)) b.armed.set(hid, true);
       this.style(b, hovered, now);
+      if (hovered && !b.id.startsWith('swatch:')) {
+        const d = b.root.position.x;
+        if (Math.abs(d) < tipD || !tipFor) {
+          tipD = Math.abs(d);
+          tipFor = b;
+        }
+      }
     }
+    this.showTooltip(tipFor);
     return out;
+  }
+
+  private showTooltip(b: Button | null): void {
+    const t = this.tooltip;
+    const text = b ? DOCK_LABELS[b.id]?.[1] : undefined;
+    if (!b || !text) {
+      t.visible = false;
+      return;
+    }
+    if (t.userData.text !== text) {
+      t.userData.text = text;
+      t.userData.draw!(text);
+    }
+    t.visible = true;
+    t.position.set(b.root.position.x, 0.06, b.root.position.z - 0.01);
+  }
+
+  /** All button positions (desk-local) — used by on-screen hints. */
+  get buttonIds(): DockAction[] {
+    return this.buttons.map((b) => b.id);
   }
 
   /** Visual press for pinch-activated buttons. */
@@ -248,25 +319,64 @@ export class Dock {
 }
 
 /** Small flat text label lying on the desk. */
-function labelMesh(text: string): Mesh {
+function labelMesh(text: string, align: 'right' | 'center' = 'right', width = 0.064): Mesh {
   const c = document.createElement('canvas');
-  c.width = 256;
+  const aspect = width / 0.016;
   c.height = 64;
+  c.width = Math.round(64 * aspect);
   const g = c.getContext('2d')!;
-  g.font = '700 40px system-ui, sans-serif';
-  g.textAlign = 'right';
+  let size = 40;
+  g.font = `800 ${size}px system-ui, sans-serif`;
+  while (g.measureText(text).width > c.width - 16 && size > 18) {
+    size -= 2;
+    g.font = `800 ${size}px system-ui, sans-serif`;
+  }
+  g.textAlign = align;
   g.textBaseline = 'middle';
-  g.fillStyle = 'rgba(10,18,28,0.6)';
-  const w = g.measureText(text).width + 24;
+  const w = g.measureText(text).width + 20;
+  g.fillStyle = 'rgba(10,18,28,0.72)';
   g.beginPath();
-  g.roundRect(256 - w, 6, w, 52, 14);
+  if (align === 'right') g.roundRect(c.width - w, 6, w, 52, 14);
+  else g.roundRect((c.width - w) / 2, 6, w, 52, 14);
   g.fill();
   g.fillStyle = '#eaf6ff';
-  g.fillText(text, 244, 33);
+  g.fillText(text, align === 'right' ? c.width - 10 : c.width / 2, 34);
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
-  const m = new Mesh(new PlaneGeometry(0.064, 0.016), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  tex.anisotropy = 4;
+  const m = new Mesh(new PlaneGeometry(width, 0.016), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
   m.rotation.x = -Math.PI / 2;
+  return m;
+}
+
+/** Upright tooltip that floats above the hovered button, facing the seated user. */
+function tooltipMesh(): Mesh & { userData: { text?: string; draw?: (t: string) => void } } {
+  const c = document.createElement('canvas');
+  c.width = 768;
+  c.height = 96;
+  const tex = new CanvasTexture(c);
+  tex.colorSpace = SRGBColorSpace;
+  const m = new Mesh(
+    new PlaneGeometry(0.2, 0.025),
+    new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }),
+  ) as Mesh & { userData: { text?: string; draw?: (t: string) => void } };
+  m.rotation.x = -0.5;
+  m.renderOrder = 30;
+  m.userData.draw = (text: string) => {
+    const g = c.getContext('2d')!;
+    g.clearRect(0, 0, c.width, c.height);
+    g.font = '700 46px system-ui, sans-serif';
+    const w = Math.min(c.width - 8, g.measureText(text).width + 48);
+    g.fillStyle = 'rgba(255,209,102,0.95)';
+    g.beginPath();
+    g.roundRect((c.width - w) / 2, 8, w, 80, 24);
+    g.fill();
+    g.fillStyle = '#10161f';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, c.width / 2, 50);
+    tex.needsUpdate = true;
+  };
   return m;
 }
 

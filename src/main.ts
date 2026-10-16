@@ -15,6 +15,7 @@ import {
   Vector3,
   WebGLRenderer,
   MOUSE,
+  TOUCH,
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { DEBUG, DESK_BELOW_HEAD, DESK_FORWARD, LOW_FX, QUERY, CELL, GRID_PRESETS, GRID_PRESET_ID, applyGridPreset, nextGridPreset } from './config.js';
@@ -38,6 +39,7 @@ import { mountDebugPanel } from './debug.js';
 import { TetrisMode } from './game/tetrisMode.js';
 import { SlingMode } from './game/slingMode.js';
 import { MODE_LAYOUT } from './ui/dock.js';
+import { ScreenPad, SLING_PAD, TETRIS_PAD } from './ui/screenPad.js';
 import { DESK_HALF_W, DESK_HALF_D } from './scene/desk.js';
 
 async function boot(): Promise<void> {
@@ -345,7 +347,7 @@ function start(): void {
   const tetris = new TetrisMode(deskRoot, shadows, gameHost);
   const sling = new SlingMode(deskRoot, shadows, gameHost);
   // Mode switcher on the left edge of the desk: build · tetris · sling, always reachable.
-  const modeBar = new Dock(MODE_LAYOUT, { x: -DESK_HALF_W - 0.045, zFront: DESK_HALF_D + 0.03, labels: { build: 'BUILD', game: 'TETRIS', sling: 'SLING' } });
+  const modeBar = new Dock(MODE_LAYOUT, { x: -DESK_HALF_W - 0.045, zFront: DESK_HALF_D + 0.03, labels: { build: 'BUILD', game: 'TETRIS', sling: 'ANGRY SLING' } });
   modeBar.setSelected('build');
   deskRoot.add(modeBar.root);
   const modeBarPinch = new Map<number, boolean>();
@@ -364,7 +366,7 @@ function start(): void {
       }
       if (p.indexTip && !p.pinching && p.kind !== 'mouse') tips.set(p.id, deskRoot.worldToLocal(p.indexTip.clone()));
     }
-    for (const a of modeBar.updatePokes(tips, now)) onDock(a);
+    for (const a of modeBar.updatePokes(tips, now, hands.pointers.filter((q) => q.active).map((q) => deskRoot.worldToLocal(q.pinchPoint.clone())))) onDock(a);
   };
 
   function setMode(next: Mode, quiet = false): void {
@@ -387,24 +389,37 @@ function start(): void {
     // Tetris brings its own neon floor; sling keeps the table look.
     desk.setDecorVisible(next !== 'game', next !== 'game' && !(session && xrMode === 'immersive-ar'));
     sfx.play('chime');
+    // Naga floats up out of the way of the game help cards.
+    naga.home.set(-0.42, build ? 0.17 : 0.4, -0.17);
+    if (!session) frameCamera(true);
     if (next === 'game') tetris.enter();
     else if (next === 'sling') sling.enter();
     else if (!quiet) say('Back to building. Your desk is just as you left it.');
     showLegend(next);
   }
 
-  // Desktop-only controls legend (in the headset the dock icons + Naga explain things).
-  const legend = document.createElement('div');
-  legend.id = 'legend';
-  document.body.appendChild(legend);
-  const LEGENDS: Record<Mode, string> = {
-    build: '',
-    game: '<b>Tetris</b> ← → move · ↑ rotate · ↓ soft drop · <b>Space</b> hard drop · W/S depth · R flip · F tilt · P pause · Esc exit',
-    sling: '<b>Sling</b> left-drag to pull back, release to fire · wheel while pulling = aim higher · right-drag to orbit · R retry · N next · Q/E turn arena · Z zoom · Esc exit',
-  };
+  // On-screen controls for laptop / phone (hidden in the headset): labelled buttons + "How to play".
+  const pad = new ScreenPad((id) => {
+    if (id === 'exit') return setMode('build');
+    sfx.unlock();
+    if (mode === 'game') tetris.action(id as never);
+    else if (mode === 'sling') sling.action(id as never);
+  });
+  const seenHelp = new Set<string>();
   function showLegend(m: Mode): void {
-    legend.innerHTML = session ? '' : LEGENDS[m];
-    legend.classList.toggle('show', !session && !!LEGENDS[m]);
+    const layout = session ? null : m === 'game' ? TETRIS_PAD : m === 'sling' ? SLING_PAD : null;
+    let first = false;
+    if (layout) {
+      try {
+        const k = `naga-atelier:help-seen:${m}`;
+        first = !seenHelp.has(m) && localStorage.getItem(k) !== '1';
+        localStorage.setItem(k, '1');
+      } catch {
+        first = !seenHelp.has(m);
+      }
+      seenHelp.add(m);
+    }
+    pad.show(layout, first);
   }
 
   onboarding = new Onboarding({
@@ -468,11 +483,13 @@ function start(): void {
     await renderer.xr.setSession(s);
     landing.classList.add('hidden');
     placeDeskNextFrame = true;
+    showLegend(mode);
     // A pinch (select) counts as a user gesture: use it to unlock audio when the session was
     // started from the browser's own "Enter" chip instead of our button.
     s.addEventListener('selectstart', () => sfx.unlock());
     s.addEventListener('end', () => {
       session = null;
+      setTimeout(() => showLegend(mode), 0);
       voice.stop();
       speaker.stop();
       interaction.cancelAll();
@@ -629,6 +646,7 @@ function start(): void {
   const orbit = new OrbitControls(camera, canvas);
   orbit.target.set(0, 0.84, -0.3);
   orbit.mouseButtons = { LEFT: null as unknown as MOUSE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE };
+  orbit.touches = { ONE: null as unknown as TOUCH, TWO: TOUCH.DOLLY_ROTATE };
   orbit.enableDamping = true;
   orbit.minDistance = 0.25;
   orbit.maxDistance = 2.5;
@@ -664,6 +682,7 @@ function start(): void {
       ev.preventDefault();
       return;
     }
+    if (k === '?' && mode !== 'build') { pad.toggleHelp(); return; }
     if (mode === 'sling' && sling.key(k)) {
       ev.preventDefault();
       return;
@@ -672,11 +691,27 @@ function start(): void {
     if ((ev.ctrlKey || ev.metaKey) && ev.key === 'z') onDock(ev.shiftKey ? 'redo' : 'undo');
     else if (ev.key === ' ') { ev.preventDefault(); void onMic(); }
   });
-  window.addEventListener('resize', () => {
+  // Frame the desk for the screen shape: phones in portrait need a wider, higher view.
+  let lastPortrait: boolean | null = null;
+  function frameCamera(force = false): void {
     camera.aspect = window.innerWidth / window.innerHeight;
+    const portrait = camera.aspect < 0.9;
+    if (portrait !== lastPortrait || force) {
+      lastPortrait = portrait;
+      camera.fov = portrait ? 72 : 55;
+      // Tetris is tall: look up the well. Sling and build look down at the table.
+      const tall = mode === 'game';
+      camera.position.set(0, (portrait ? 1.7 : 1.36) + (tall ? 0.05 : 0), (portrait ? 0.78 : 0.5) + (tall ? 0.22 : 0));
+      orbit.target.set(0, tall ? 1.02 : 0.84, portrait ? -0.25 : -0.3);
+      orbit.update();
+    }
+    // leave room for the on-screen control bar at the bottom (laptop / phone game modes)
+    camera.setViewOffset(window.innerWidth, window.innerHeight, 0, mode !== 'build' ? window.innerHeight * (portrait ? 0.16 : 0.1) : 0, window.innerWidth, window.innerHeight);
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+  };
+  frameCamera();
+  window.addEventListener('resize', () => frameCamera());
 
   // ------------------------------------------------------------- frame loop
   let last = performance.now();

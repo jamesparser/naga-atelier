@@ -35,6 +35,8 @@ import { CarryMesh, GhostMesh, VoxelRenderer, cellCenter } from '../blocks/voxel
 import { Dock, GAME_LAYOUT, type DockAction } from '../ui/dock.js';
 import { Sparkles } from '../fx/sparkles.js';
 import { NeonStage, neonMaterial } from './neonStage.js';
+import { helpCard } from '../ui/helpCard.js';
+import { TETRIS_PAD } from '../ui/screenPad.js';
 import { SynthMusic } from '../audio/music.js';
 import type { Pointer } from '../hands/handInput.js';
 import { Tetris3D, WELL_D, WELL_H, WELL_W, type Axis, type Piece, type TetrisEvent, type V3 } from './tetris.js';
@@ -159,6 +161,11 @@ export class TetrisMode {
     this.nextMesh.group.position.set(X1 + 0.11, 0.31, Z0 + 0.03);
     this.nextMesh.group.scale.setScalar(0.7 * this.s);
 
+    // In-headset how-to card, left of the well (same text as the on-screen help).
+    const card = helpCard('How to play', TETRIS_PAD.help.filter((h) => h.head.startsWith('Quest')).map((h) => ({ head: h.head.replace('Quest — ', ''), lines: h.lines })), 0.17);
+    card.position.set(OX * TCELL - 0.12, 0.2, OZ * TCELL + 0.02);
+    card.rotation.y = 0.45;
+    this.root.add(card);
     this.stage = new NeonStage(OX * TCELL, (OX + WELL_W) * TCELL, WELL_H * TCELL, OZ * TCELL);
     this.root.add(this.stage.root);
 
@@ -177,7 +184,7 @@ export class TetrisMode {
     this.game.start();
     this.stage.setPassthrough(this.host.passthrough?.() ?? false);
     this.music.start(sfx.ctx, 1);
-    this.host.say('Tetris! Pinch to steer, twist your wrist to flip, flick down to drop.');
+    this.host.say('Tetris! Fill a row left to right to blast it. The card on the left shows the controls.');
   }
 
   exit(): void {
@@ -226,11 +233,14 @@ export class TetrisMode {
   /** Desktop keyboard. Returns true when the key was used. */
   key(k: string): boolean {
     const map: Record<string, Parameters<TetrisMode['action']>[0]> = {
-      // Classic Tetris keys first: ←/→ move, ↑ rotate, ↓ soft drop, Space hard drop.
-      ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'spin', ArrowDown: 'down', ' ': 'drop',
-      // 3D extras: W/S move away/closer, A/D also move, Q/E spin, R flip, F tilt.
-      a: 'left', d: 'right', w: 'away', s: 'closer', q: 'spin', e: 'spin', r: 'flip', f: 'tilt',
-      x: 'down', Enter: 'drop', Shift: 'down', p: 'pause', Escape: 'exit',
+      // Arrows move the piece around the well floor: ← → left/right, ↑ ↓ back/front row (4 rows deep).
+      ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'away', ArrowDown: 'closer',
+      a: 'left', d: 'right', w: 'away', s: 'closer',
+      // Turning: Q/E spin flat, R flip toward you, F tilt sideways.
+      q: 'spin', e: 'spin', r: 'flip', f: 'tilt',
+      // Falling: hold Shift (or X) = faster, Space (or Enter) = drop now.
+      Shift: 'down', x: 'down', ' ': 'drop', Enter: 'drop',
+      p: 'pause', Escape: 'exit',
     };
     const a = map[k];
     if (!a) return false;
@@ -306,7 +316,7 @@ export class TetrisMode {
       this.steer(g, local, now);
       if (p.wristQuat && g.q0) this.twist(g, p.wristQuat);
     }
-    for (const a of this.dock.updatePokes(tips, now)) this.action(a);
+    for (const a of this.dock.updatePokes(tips, now, pointers.filter((q) => q.active).map((q) => this.deskRoot.worldToLocal(q.pinchPoint.clone())))) this.action(a);
   }
 
   private steer(g: Grab, local: Vector3, now: number): void {
@@ -447,7 +457,7 @@ export class TetrisMode {
             /* ignore */
           }
         }
-        this.host.say(record ? `New best: ${ev.score}! Tap drop to play again.` : `Game over — ${ev.score}. Tap drop to play again.`);
+        this.host.say(record ? `New best: ${ev.score}! Press DROP to play again.` : `Game over — ${ev.score}. Press DROP to play again.`);
         break;
       }
       default:

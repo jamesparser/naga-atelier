@@ -43,21 +43,21 @@ The room dims, a hue-cycling vector tunnel and a warp starfield stream out behin
 The same cube blocks fall as the seven classic tetrominoes. Fill a straight row from left to right and it blows up
 in sparkles. Fill a whole layer and you get a big bonus. Blocks above a cleared row fall into its slice.
 
-| Hands | Controller (optional) | Keyboard (desktop) |
-|---|---|---|
-| Pinch anywhere and move: steer left/right and toward/away | Thumbstick | ← → move · W/S depth |
-| Pinch and twist your wrist about 50°: flip about that axis | A/X spin · B/Y flip · stick-click tilt | ↑ rotate · R flip · F tilt |
-| Quick pinch-tap: spin | | |
-| Pinch and pull down: soft drop · flick down fast: hard drop | **Hold grip: fast fall** · **trigger: slam** | ↓ soft drop · **Space** hard drop |
-| Dock: tilt · flip · spin · drop · pause · back to build (house) | | P pause · Esc exit |
+| Action | Keyboard | Mouse / touch | Quest hands | Quest controller |
+|---|---|---|---|---|
+| Move left / right | ← → (or A/D) | drag sideways, or Left / Right buttons | pinch and move your hand | thumbstick left / right |
+| Back row / front row (4 deep) | ↑ ↓ (or W/S) | drag up / down the screen, or Back row / Front row | pinch and move away / toward you | thumbstick up / down |
+| Spin · Flip · Tilt | Q or E · R · F | quick tap = spin, or the buttons | quick pinch = spin; pinch + twist wrist = flip / tilt | A/X · B/Y · press stick |
+| Fall faster · Drop now | hold Shift · Space | Faster (hold) · Drop | pull down · flick down | hold grip · trigger |
+| Pause · Help · Back | P · ? · Esc | buttons in the control bar | poke PAUSE / BACK on the desk | press the desk buttons |
 
 Your build desk is untouched while you play. Say **“back to building”** to return to it. Your best score is saved on the device.
 
-## Sling mode
+## Angry Sling
 
-Tap **SLING** on the mode bar (left edge of the desk), or say **“slingshot”**. A tabletop physics puzzle appears:
+Tap **ANGRY SLING** on the mode bar (left edge of the desk), or say **“angry sling”**. A tabletop physics puzzle appears:
 pull back the slingshot, let a glowing pebble fly, and knock down glass, wood and stone towers to pop the purple
-*gloomlings* hiding in them. There are **6 levels** (First flight → Sky castle), 3 stars each, and progress is saved on the device.
+*gloomlings* hiding in them. There are **12 levels** (First flight → Citadel), 3 stars each, and progress is saved on the device.
 
 - **Hands:** pinch (on the pebble or anywhere), pull back toward you, release. The dotted arc shows where it will go.
 - **Controller:** hold the trigger, pull back, let go.

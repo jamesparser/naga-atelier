@@ -59,6 +59,8 @@ describe('intent parser', () => {
     ['exit the game', { type: 'game', action: 'stop' }],
     ['drop', { type: 'game', action: 'drop' }],
     ['pause', { type: 'game', action: 'pause' }],
+    ['play angry sling', { type: 'game', action: 'start', game: 'sling' }],
+    ['next level', { type: 'game', action: 'next' }],
   ];
   for (const [text, want] of cases) {
     it(text, () => {

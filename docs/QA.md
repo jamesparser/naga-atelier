@@ -32,7 +32,7 @@
 - [ ] Neon look reads well over passthrough (hands still visible through the dimmed room); music volume OK; 60 fps with tunnel + stars
 - [ ] Controller: hold grip = fast fall, trigger = slam, A/X spin, B/Y flip
 
-## Sling mode
+## Angry Sling
 - [ ] SLING on the mode bar / "slingshot" opens level 1; pinch-pull-release launches reliably with hands and with a controller trigger
 - [ ] Trajectory dots match the flight; glass shatters, wood breaks after hits, stone survives light hits
 - [ ] Gloomlings pop with sparkles; level-cleared message, stars, next level; retry works

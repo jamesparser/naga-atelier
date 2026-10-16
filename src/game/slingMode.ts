@@ -33,6 +33,8 @@ import { sfx } from '../audio/sfx.js';
 import { bevelTexture } from '../blocks/voxelRenderer.js';
 import { Dock, SLING_LAYOUT, type DockAction } from '../ui/dock.js';
 import { Sparkles } from '../fx/sparkles.js';
+import { helpCard } from '../ui/helpCard.js';
+import { SLING_PAD } from '../ui/screenPad.js';
 import type { Pointer } from '../hands/handInput.js';
 import { LEVELS, type BirdKind, type BlockMat, type LevelDef } from './slingLevels.js';
 import { BIRD, GROUND_X, GROUND_Z0, GROUND_Z1, MAT, createLevelBodies, createWorld } from './slingPhysics.js';
@@ -214,6 +216,11 @@ export class SlingMode {
     this.root.add(panelMesh);
     this.panel = { canvas, tex, last: '' };
 
+    const card = helpCard('How to play', SLING_PAD.help.filter((h) => h.head.startsWith('Quest')).map((h) => ({ head: h.head.replace('Quest — ', ''), lines: h.lines })), 0.17);
+    card.position.set(-0.36, 0.2, -0.04);
+    card.rotation.y = 0.5;
+    this.root.add(card);
+
     try {
       this.progress = JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? '{}') ?? {};
     } catch {
@@ -228,7 +235,7 @@ export class SlingMode {
     // start from the first level without 3 stars
     const i = LEVELS.findIndex((l) => (this.progress[l.id] ?? 0) < 3);
     this.load(i < 0 ? 0 : i);
-    this.host.say(`Sling mode! Pinch and pull back to launch. Level ${this.level.id}: ${this.level.name}.`);
+    this.host.say(`Angry Sling! Pinch, pull back toward you, let go. Level ${this.level.id}: ${this.level.name}.`);
   }
 
   exit(): void {
@@ -358,7 +365,7 @@ export class SlingMode {
     this.state = 'won';
     this.stateT = 0;
     sfx.play('levelup');
-    this.host.say(`Level cleared! ${stars} star${stars > 1 ? 's' : ''}, ${this.score} points. Tap next.`);
+    this.host.say(`Level cleared! ${stars} star${stars > 1 ? 's' : ''}, ${this.score} points. Press NEXT LEVEL.`);
   }
 
   // ----------------------------------------------------------------- per frame
@@ -404,7 +411,7 @@ export class SlingMode {
         this.stateT = 0;
         sfx.play('gameover');
         const left = this.targets.filter((t) => t.alive).length;
-        this.host.say(`Out of pebbles — ${left} gloomling${left > 1 ? 's' : ''} left. Tap retry.`);
+        this.host.say(`Out of pebbles — ${left} gloomling${left > 1 ? 's' : ''} left. Press RETRY.`);
       }
     }
     this.render(dt);
@@ -453,7 +460,7 @@ export class SlingMode {
       const cur = this.pull.pouch.distanceTo(LAUNCH);
       if (Math.floor(cur * 6) > Math.floor(prev * 6)) sfx.play('tick');
     }
-    for (const a of this.dock.updatePokes(tips, now)) this.action(a);
+    for (const a of this.dock.updatePokes(tips, now, pointers.filter((q) => q.active).map((q) => this.deskRoot.worldToLocal(q.pinchPoint.clone())))) this.action(a);
   }
 
   /** Desktop: raise/lower the aim while pulling with the mouse. */

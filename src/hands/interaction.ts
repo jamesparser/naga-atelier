@@ -195,7 +195,7 @@ export class Interaction {
 
     this.desk.setTrashHot(trashHot);
     this.renderer.setHover(hover);
-    for (const action of this.dock.updatePokes(tips, now)) this.emit({ type: 'dock', action });
+    for (const action of this.dock.updatePokes(tips, now, pointers.filter((q) => q.active).map((q) => this.deskRoot.worldToLocal(q.pinchPoint.clone())))) this.emit({ type: 'dock', action });
   }
 
   /** Nearest occupied cell to a desk-local point within the grab radius. */

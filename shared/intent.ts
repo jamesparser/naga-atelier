@@ -101,8 +101,8 @@ export function parseIntent(raw: string): AgentEnvelope | null {
   if (/\b(stop|exit|quit|end|leave|close) (the )?(game|tetris)\b/.test(t) || /\b(build(ing)? mode|back to build(ing)?)\b/.test(t)) {
     return envelope('Back to building.', { v: 1, type: 'game', action: 'stop' });
   }
-  if (/\b(angry birds?|sling ?shot|sling mode|catapult|birds? game|launch(ing)? game|knock (them|it) down)\b/.test(t)) {
-    return envelope('Sling mode — pull back and let fly!', { v: 1, type: 'game', action: 'start', game: 'sling' });
+  if (/\b(angry birds?|angry sling|sling ?shot|sling mode|play sling|catapult|birds? game|launch(ing)? game|knock (them|it) down)\b/.test(t)) {
+    return envelope('Angry Sling — pull back and let fly!', { v: 1, type: 'game', action: 'start', game: 'sling' });
   }
   if (/\b(next level|skip level)\b/.test(t)) {
     return envelope('Next level.', { v: 1, type: 'game', action: 'next' });

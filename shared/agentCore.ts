@@ -24,7 +24,7 @@ Omit fields that do not apply. blueprintIds: ${BLUEPRINT_IDS.join(', ')}.
 Palette: ${PALETTE_NAMES.join(', ')} (red=roof_red, green=grass, blue=sky, yellow=gold, black=ink, grey=stone).
 Parts users may name as "target": roof, walls, windows, door, chimney, tower, top, flag, lawn, pond, tree, flowers, steps, books, pillars, arch, keystone, seat, legs, backrest, hearth, fire, hedges.
 type "scale": "scale" is a relative factor (bigger 1.25, smaller 0.8). type "move": dx/dy/dz in metres, +x right, +z toward the user, typical 0.08.
-type "game" controls the 3D Tetris mode: add "action":"start|stop|pause|drop|retry|next" and for start "game":"tetris|sling" ("let's play tetris" -> start tetris, "slingshot"/"angry birds" -> start sling, "back to building" -> stop).
+type "game" controls the 3D Tetris mode: add "action":"start|stop|pause|drop|retry|next" and for start "game":"tetris|sling" ("let's play tetris" -> start tetris, "angry sling"/"slingshot" -> start sling, "back to building" -> stop).
 Map loose requests to the closest blueprint (somewhere to sit -> bench, a place for books -> desk_shelf, a castle -> tower).
 If the user is only chatting, or asks for something you cannot build, set "build": null and suggest what you can build.
 Never invent blueprint ids. Output JSON only, no markdown, no reasoning.`;
