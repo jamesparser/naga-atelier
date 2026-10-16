@@ -57,11 +57,11 @@ export const TETRIS_PAD: PadLayout = {
 
 export const SLING_PAD: PadLayout = {
   title: 'Angry Sling',
-  hint: 'Drag back from the slingshot and let go. Knock the purple gloomlings off their towers.',
+  hint: 'Drag back from the slingshot and let go. Pop every purple gloomling to move on to the next of 12 levels.',
   rows: [
     [
       { id: 'retry', label: 'Retry level', key: 'R', tip: 'Restart this level (R)' },
-      { id: 'next', label: 'Next level', key: 'N', tip: 'Go to the next level (N)' },
+      { id: 'next', label: 'Skip level', key: 'N', tip: 'Skip to the next level (N). Cleared levels advance on their own.' },
       { id: 'turnL', label: 'Turn left', key: 'Q', tip: 'Turn the arena left (Q)' },
       { id: 'turnR', label: 'Turn right', key: 'E', tip: 'Turn the arena right (E)' },
       { id: 'zoom', label: 'Zoom', key: 'Z', tip: 'Bigger / smaller arena (Z)' },
@@ -73,7 +73,7 @@ export const SLING_PAD: PadLayout = {
   ],
   help: [
     { head: 'Mouse or touch', lines: ['Press anywhere, drag toward you (down the screen), let go to fire', 'The dotted arc shows where it will fly', 'Mouse wheel while dragging = aim higher', 'Right-drag (two fingers on phone) = look around'] },
-    { head: 'Keyboard', lines: ['R retry · N next level · Q / E turn arena · Z zoom · Esc back'] },
+    { head: 'Keyboard', lines: ['R retry · N skip level · Q / E turn arena · Z zoom · Esc back'] },
     { head: 'Quest — hands', lines: ['Pinch (on the pebble or anywhere), pull back toward you, open your fingers to fire', 'Lean in or poke TURN / ZOOM to see from other angles'] },
     { head: 'Quest — controllers', lines: ['Hold the trigger, pull back, let go to fire', 'Point at the desk buttons and pull the trigger to press them'] },
   ],

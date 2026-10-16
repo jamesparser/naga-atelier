@@ -62,7 +62,7 @@ pull back the slingshot, let a glowing pebble fly, and knock down glass, wood an
 - **Hands:** pinch (on the pebble or anywhere), pull back toward you, release. The dotted arc shows where it will go.
 - **Controller:** hold the trigger, pull back, let go.
 - **Look from any angle:** lean in or walk around, or use the dock to **turn the arena** 45° left/right and **zoom** (1.15× ↔ 1.8×).
-- **Dock:** back to build · retry · next level · turn left · turn right · zoom · mic.
+- **Clearing a level moves you straight to the next one** (after a 3-second celebration). After level 12 it starts over. **Dock:** back · retry · skip level · turn left · turn right · zoom · voice.
 - **Desktop:** left-drag to pull (wheel while pulling aims higher), right-drag to orbit, R retry, N next, Q/E turn, Z zoom.
 
 The physics (cannon-es) is simulated at full scale (1 m blocks) and rendered at 1:10, so towers fall with real weight.

@@ -45,6 +45,8 @@ const FORK_HALF = 0.28;
 const MAX_PULL = 1.25; // arena units (12.5 cm on the desk)
 const MAX_SPEED = 10.5; // m/s at full pull
 const PROGRESS_KEY = 'naga-atelier:sling-progress:v1';
+/** seconds of celebration before the next level loads automatically */
+const AUTO_NEXT_S = 3.2;
 
 interface Block {
   body: CANNON.Body;
@@ -235,7 +237,7 @@ export class SlingMode {
     // start from the first level without 3 stars
     const i = LEVELS.findIndex((l) => (this.progress[l.id] ?? 0) < 3);
     this.load(i < 0 ? 0 : i);
-    this.host.say(`Angry Sling! Pinch, pull back toward you, let go. Level ${this.level.id}: ${this.level.name}.`);
+    this.host.say(`Angry Sling! Pinch, pull back toward you, let go. Level ${this.level.id} of ${LEVELS.length}: ${this.level.name}.`);
   }
 
   exit(): void {
@@ -295,8 +297,8 @@ export class SlingMode {
 
   action(a: DockAction): void {
     switch (a) {
-      case 'retry': this.load(this.levelIndex); this.host.say(`Level ${this.level.id}: ${this.level.name}.`); sfx.play('click'); break;
-      case 'next': this.load(this.levelIndex + 1); this.host.say(`Level ${this.level.id}: ${this.level.name}.`); sfx.play('click'); break;
+      case 'retry': this.load(this.levelIndex); this.host.say(`Level ${this.level.id} of ${LEVELS.length}: ${this.level.name}.`); sfx.play('click'); break;
+      case 'next': this.load(this.levelIndex + 1); this.host.say(`Level ${this.level.id} of ${LEVELS.length}: ${this.level.name}.`); sfx.play('click'); break;
       case 'turnL': this.yaw += Math.PI / 4; sfx.play('click'); break;
       case 'turnR': this.yaw -= Math.PI / 4; sfx.play('click'); break;
       case 'zoom': this.zoom = this.zoom < 1.5 ? 1.8 : 1.15; sfx.play('click'); break;
@@ -365,7 +367,13 @@ export class SlingMode {
     this.state = 'won';
     this.stateT = 0;
     sfx.play('levelup');
-    this.host.say(`Level cleared! ${stars} star${stars > 1 ? 's' : ''}, ${this.score} points. Press NEXT LEVEL.`);
+    const last = this.levelIndex === LEVELS.length - 1;
+    this.host.say(
+      last
+        ? `You beat all ${LEVELS.length} levels! ${stars} star${stars > 1 ? 's' : ''}. Starting over from level 1…`
+        : `Level cleared! ${stars} star${stars > 1 ? 's' : ''}, ${this.score} points. Next level coming up…`,
+    );
+    this.host.celebrate();
   }
 
   // ----------------------------------------------------------------- per frame
@@ -391,6 +399,11 @@ export class SlingMode {
     for (const b of this.blocks) if (b.alive && b.body.position.y < -0.6) this.destroy(b);
 
     this.stateT += dt;
+    // Cleared: celebrate for a moment, then go straight to the next level (no button needed).
+    if (this.state === 'won' && this.stateT > AUTO_NEXT_S) {
+      this.load(this.levelIndex + 1);
+      this.host.say(`Level ${this.level.id} of ${LEVELS.length}: ${this.level.name}.`);
+    }
     if (this.state === 'flying' && this.bird) {
       const v = this.bird.velocity.length();
       this.trailT += dt;
@@ -594,7 +607,7 @@ export class SlingMode {
     c.fill();
     c.fillStyle = '#ffd166';
     c.font = '700 34px system-ui, sans-serif';
-    c.fillText(`LEVEL ${this.level.id} · ${this.level.name}`, 36, 62);
+    c.fillText(`LEVEL ${this.level.id}/${LEVELS.length} · ${this.level.name}`, 36, 62);
     c.fillStyle = '#eafcff';
     c.font = '800 72px system-ui, sans-serif';
     c.fillText(String(this.score), 36, 150);
@@ -614,7 +627,7 @@ export class SlingMode {
     if (this.state === 'won' || this.state === 'lost') {
       c.fillStyle = this.state === 'won' ? '#8ff0a4' : '#ff8a8a';
       c.font = '800 40px system-ui, sans-serif';
-      c.fillText(this.state === 'won' ? 'CLEARED!' : 'TRY AGAIN', 36, 344);
+      c.fillText(this.state === 'won' ? 'CLEARED! NEXT…' : 'TRY AGAIN', 36, 344);
     }
     this.panel.tex.needsUpdate = true;
   }

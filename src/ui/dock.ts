@@ -47,7 +47,7 @@ export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
   drop: ['DROP', 'Drop the piece now (or play again)'],
   pause: ['PAUSE', 'Pause / resume'],
   retry: ['RETRY', 'Restart this level'],
-  next: ['NEXT LEVEL', 'Skip to the next level'],
+  next: ['SKIP LEVEL', 'Skip to the next level (cleared levels advance on their own)'],
   turnL: ['TURN LEFT', 'Turn the arena left'],
   turnR: ['TURN RIGHT', 'Turn the arena right'],
   zoom: ['ZOOM', 'Bigger / smaller arena'],
