@@ -48,7 +48,10 @@ export const COMMAND_TYPES = [
   'rotate',
   'export',
   'grid',
+  'game',
 ] as const;
+export const GAME_ACTIONS = ['start', 'stop', 'pause', 'drop'] as const;
+export type GameAction = (typeof GAME_ACTIONS)[number];
 export type CommandType = (typeof COMMAND_TYPES)[number];
 
 export const GRID_PRESET_IDS = ['draft', 'studio', 'detail', 'fine', 'mosaic'] as const;
@@ -70,6 +73,8 @@ export interface BuildCommand {
   dx?: number;
   dy?: number;
   dz?: number;
+  /** game: Tetris mode control */
+  action?: GameAction;
   /** rotate: quarter turns clockwise seen from above (default 1) */
   turns?: number;
   /** grid: which block-size preset to switch to */
@@ -134,6 +139,10 @@ export function sanitizeCommand(raw: unknown): BuildCommand | null {
   if (type === 'move' && cmd.dx === undefined && cmd.dy === undefined && cmd.dz === undefined) return null;
   if (typeof raw.turns === 'number' && Number.isFinite(raw.turns)) {
     cmd.turns = ((Math.round(raw.turns) % 4) + 4) % 4 || 1;
+  }
+  if (type === 'game') {
+    if (typeof raw.action !== 'string' || !(GAME_ACTIONS as readonly string[]).includes(raw.action)) return null;
+    cmd.action = raw.action as GameAction;
   }
   if (typeof raw.message === 'string') cmd.message = raw.message.slice(0, 160);
   if (typeof raw.ts === 'number') cmd.ts = raw.ts;

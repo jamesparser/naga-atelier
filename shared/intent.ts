@@ -97,6 +97,19 @@ export function parseIntent(raw: string): AgentEnvelope | null {
   const t = normalise(raw);
   if (t.trim().length === 0) return null;
 
+  // --- tetris mode -------------------------------------------------------
+  if (/\b(stop|exit|quit|end|leave|close) (the )?(game|tetris)\b/.test(t) || /\b(build(ing)? mode|back to build(ing)?)\b/.test(t)) {
+    return envelope('Back to building.', { v: 1, type: 'game', action: 'stop' });
+  }
+  if (/\b(tetris|play (a |the )?game|game mode|lets play|start (a |the )?game|new game)\b/.test(t)) {
+    return envelope(pick(['Tetris time!', "Let's play Tetris!"], t), { v: 1, type: 'game', action: 'start' });
+  }
+  if (/\b(pause|resume|unpause)\b/.test(t)) {
+    return envelope('Okay.', { v: 1, type: 'game', action: 'pause' });
+  }
+  if (/^ (drop( it)?|slam( it)?|hard drop) $/.test(t)) {
+    return envelope('Drop!', { v: 1, type: 'game', action: 'drop' });
+  }
   // --- history ---------------------------------------------------------
   if (/\b(redo|do that again|put it back)\b/.test(t)) {
     return envelope('Redone.', { v: 1, type: 'redo' });

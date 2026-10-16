@@ -2,7 +2,8 @@
  * Synthesised UI sounds (no audio files to load). Hand tracking has no haptics,
  * so every hand action gets an audible confirmation.
  */
-export type Sfx = 'pickup' | 'snap' | 'place' | 'delete' | 'undo' | 'redo' | 'cast' | 'error' | 'click' | 'detach' | 'paint' | 'chime' | 'listen';
+export type Sfx = 'pickup' | 'snap' | 'place' | 'delete' | 'undo' | 'redo' | 'cast' | 'error' | 'click' | 'detach' | 'paint' | 'chime' | 'listen'
+  | 'rotate' | 'lock' | 'clear' | 'bigclear' | 'levelup' | 'gameover' | 'tick';
 
 export class SoundBoard {
   ctx: AudioContext | null = null;
@@ -60,6 +61,24 @@ export class SoundBoard {
         [784, 1175, 1568].forEach((f, i) => this.tone(t + i * 0.09, f, f, 0.5, 0.11, 'sine'));
         return;
       case 'listen': return this.tone(t, 600, 900, 0.1, 0.12, 'sine');
+      case 'tick': return this.tone(t, 1800, 1600, 0.02, 0.06, 'square', 0.2);
+      case 'rotate': return this.tone(t, 700 * pitch, 1050 * pitch, 0.05, 0.12, 'triangle');
+      case 'lock':
+        this.noise(t, 0.05, 0.18, 700);
+        return this.tone(t, 140, 90, 0.1, 0.3, 'sine');
+      case 'clear':
+        [659, 784, 988, 1319].forEach((f, i) => this.tone(t + i * 0.045, f * pitch, f * pitch * 1.02, 0.22, 0.12, 'triangle'));
+        return this.noise(t + 0.05, 0.5, 0.12, 6000, 1500);
+      case 'bigclear':
+        [523, 659, 784, 1047, 1319, 1568, 2093].forEach((f, i) => this.tone(t + i * 0.05, f, f * 1.01, 0.4, 0.12, 'triangle'));
+        this.noise(t, 0.25, 0.3, 300, 80);
+        return this.noise(t + 0.1, 0.9, 0.15, 7000, 2000);
+      case 'levelup':
+        [392, 523, 659, 784].forEach((f, i) => this.tone(t + i * 0.08, f, f, 0.25, 0.12, 'square', 0.4));
+        return;
+      case 'gameover':
+        [523, 466, 415, 349, 262].forEach((f, i) => this.tone(t + i * 0.16, f, f * 0.98, 0.3, 0.14, 'triangle'));
+        return;
       case 'error':
         this.tone(t, 300, 220, 0.12, 0.2, 'square', 0.15);
         return this.tone(t + 0.13, 220, 180, 0.15, 0.2, 'square', 0.15);

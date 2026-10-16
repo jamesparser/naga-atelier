@@ -54,6 +54,11 @@ describe('intent parser', () => {
     ['move it left', { type: 'move', dx: -0.08 }],
     ['rotate it', { type: 'rotate', turns: 1 }],
     ['paint the windows blue', { type: 'color', color: 'sky', target: 'windows' }],
+    ["let's play tetris", { type: 'game', action: 'start' }],
+    ['back to building', { type: 'game', action: 'stop' }],
+    ['exit the game', { type: 'game', action: 'stop' }],
+    ['drop', { type: 'game', action: 'drop' }],
+    ['pause', { type: 'game', action: 'pause' }],
   ];
   for (const [text, want] of cases) {
     it(text, () => {

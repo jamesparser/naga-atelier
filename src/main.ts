@@ -33,6 +33,7 @@ import { BLUEPRINTS } from './blueprints/index.js';
 import { Onboarding } from './onboarding.js';
 import { downloadWorld } from './export/worldExport.js';
 import { mountDebugPanel } from './debug.js';
+import { TetrisMode } from './game/tetrisMode.js';
 
 async function boot(): Promise<void> {
   if (QUERY.has('emulate')) {
@@ -194,6 +195,22 @@ function start(): void {
   const handleEnvelope = (env: AgentEnvelope) => {
     if (env.transcript) naga.caption.heard(env.transcript);
     let speech = env.speech;
+    const b = env.build;
+    // Tetris mode: game commands, and in-game "rotate / move left / drop" go to the game.
+    if (b?.type === 'game') {
+      if (b.action === 'start') setMode('game');
+      else if (b.action === 'stop') setMode('build');
+      else if (mode === 'game') tetris.action(b.action === 'drop' ? 'drop' : 'pause');
+      else speech = 'Say “play Tetris” to start a game.';
+      say(speech, speech === env.speech ? env.audio : null);
+      return;
+    }
+    if (mode === 'game' && b && (b.type === 'rotate' || b.type === 'move')) {
+      if (b.type === 'rotate') tetris.action(b.turns === 2 ? 'flip' : 'spin');
+      else tetris.action((b.dx ?? 0) < 0 ? 'left' : (b.dx ?? 0) > 0 ? 'right' : (b.dz ?? 0) > 0 ? 'closer' : (b.dz ?? 0) < 0 ? 'away' : 'down');
+      return;
+    }
+    if (mode === 'game' && b) setMode('build', true); // any build request leaves the game
     if (env.build) {
       if (interaction.busy) {
         pending.push(env.build); // hands win: apply after the drop
@@ -285,6 +302,7 @@ function start(): void {
         interaction.cancelAll();
         apply({ v: 1, type: 'grid' });
         break;
+      case 'game': setMode('game'); break;
       case 'recenter':
         sfx.play('click');
         placeDeskNextFrame = true;
@@ -305,6 +323,35 @@ function start(): void {
   };
 
   const interaction = new Interaction(model, voxels, desk, dock, deskRoot, shadows, onInteraction);
+
+  // ------------------------------------------------------------- Tetris mode
+  let mode: 'build' | 'game' = 'build';
+  const tetris = new TetrisMode(deskRoot, shadows, {
+    say: (t) => say(t),
+    celebrate: () => naga.setMood('happy', 1200),
+    exit: () => setMode('build'),
+    mic: () => void onMic(),
+  });
+  function setMode(next: 'build' | 'game', quiet = false): void {
+    if (next === mode) return;
+    mode = next;
+    const game = next === 'game';
+    if (game) {
+      interaction.cancelAll();
+      onboarding.active = false;
+      naga.caption.setHint('');
+      dock.setAttention(null);
+    }
+    voxels.mesh.visible = !game;
+    dock.root.visible = !game;
+    desk.trash.visible = !game;
+    sfx.play('chime');
+    if (game) tetris.enter();
+    else {
+      tetris.exit();
+      if (!quiet) say('Back to building. Your desk is just as you left it.');
+    }
+  }
 
   onboarding = new Onboarding({
     say: (t) => say(t),
@@ -391,6 +438,7 @@ function start(): void {
         voice.stop();
         speaker.stop();
         interaction.cancelAll();
+        tetris.pausedByHost();
         sfx.suspend();
       }
     });
@@ -542,6 +590,10 @@ function start(): void {
   }, { passive: false });
   window.addEventListener('keydown', (ev) => {
     if ((ev.target as HTMLElement).tagName === 'INPUT' || (ev.target as HTMLElement).tagName === 'TEXTAREA') return;
+    if (mode === 'game' && ev.key !== ' ' && tetris.key(ev.key.length === 1 ? ev.key.toLowerCase() : ev.key)) {
+      ev.preventDefault();
+      return;
+    }
     if ((ev.ctrlKey || ev.metaKey) && ev.key === 'z') onDock(ev.shiftKey ? 'redo' : 'undo');
     else if (ev.key === ' ') { ev.preventDefault(); void onMic(); }
   });
@@ -574,7 +626,8 @@ function start(): void {
       if (ref) hands.update(frame, ref);
       mouse.active = false;
     }
-    interaction.update(hands.pointers, now);
+    if (mode === 'game') tetris.update(hands.pointers, now, dt);
+    else interaction.update(hands.pointers, now);
     while (pending.length && !interaction.busy) apply(pending.shift()!);
     voxels.update(now);
     naga.setLevel(voice.listening ? voice.level : speaker.level);
@@ -606,6 +659,9 @@ function start(): void {
     pointers: () => hands.pointers.map((p) => ({ id: p.id, kind: p.kind, active: p.active, pinching: p.pinching, pinch: p.pinchPoint.toArray(), tip: p.indexTip?.toArray() ?? null })),
     caption: () => naga.caption,
     interaction,
+    tetris,
+    setMode: (m: 'build' | 'game') => setMode(m),
+    mode: () => mode,
   };
   (window as unknown as { __naga: typeof api }).__naga = api;
   if (DEBUG) mountDebugPanel(api);

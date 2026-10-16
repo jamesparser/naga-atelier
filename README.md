@@ -36,6 +36,22 @@ Built for the Meta VR Start Developer Competition 2026 (Productivity track, New 
 Hand tracking has no haptics, so every action has a sound: pickup tick, snap thunk, delete whoosh, undo chime.
 Everything sits within about 60 cm of a seated user, and the dock is in the lower field of view.
 
+## Tetris mode
+
+Tap the **T-block** button on the dock (or say **“let's play Tetris”**) and the desk turns into a 10 × 4 × 14 glass well.
+The same cube blocks fall as the seven classic tetrominoes. Fill a straight row from left to right and it blows up
+in sparkles. Fill a whole layer and you get a big bonus. Blocks above a cleared row fall into its slice.
+
+| Hands | Controller (optional) | Keyboard (desktop) |
+|---|---|---|
+| Pinch anywhere and move: steer left/right and toward/away | Thumbstick | Arrows / WASD |
+| Pinch and twist your wrist about 50°: flip about that axis | A/X spin · B/Y flip · grip tilt | Q/E spin · R flip · F tilt |
+| Quick pinch-tap: spin | | |
+| Pinch and pull down: soft drop · flick down fast: hard drop | Stick click: hard drop | Shift soft · Enter hard |
+| Dock: tilt · flip · spin · drop · pause · back to build (house) | | P pause · Esc exit |
+
+Your build desk is untouched while you play. Say **“back to building”** to return to it. Your best score is saved on the device.
+
 ## Voice commands
 
 Naga understands open phrasing through an LLM, with a fast deterministic parser for clear commands:

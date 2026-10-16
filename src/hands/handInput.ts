@@ -30,6 +30,10 @@ export interface Pointer {
   indexTip: Vector3 | null;
   /** Wrist/grip position, used for the palm-facing check of the help gesture. */
   wrist: Vector3 | null;
+  /** Wrist (hand) or grip (controller) orientation, for twist-to-flip in Tetris mode. */
+  wristQuat: Quaternion | null;
+  /** Raw gamepad of a controller pointer (thumbstick / face buttons in Tetris mode). */
+  gamepad: Gamepad | null;
 }
 
 const JOINTS: XRHandJoint[] = [
@@ -68,7 +72,7 @@ export class HandTracker {
   private pointer(id: number, kind: PointerKind, handedness: XRHandedness): Pointer {
     let p = this.pointers.find((x) => x.id === id);
     if (!p) {
-      p = { id, kind, handedness, active: false, pinching: false, strength: 0, pinchPoint: new Vector3(), indexTip: null, wrist: null };
+      p = { id, kind, handedness, active: false, pinching: false, strength: 0, pinchPoint: new Vector3(), indexTip: null, wrist: null, wristQuat: null, gamepad: null };
       this.pointers.push(p);
     }
     return p;
@@ -98,6 +102,11 @@ export class HandTracker {
         else p.pinchPoint.lerp(mid, p.pinching ? 0.55 : 0.7);
         p.indexTip = (p.indexTip ?? new Vector3()).copy(tmpB);
         p.wrist = wrist ? (p.wrist ?? new Vector3()).set(wrist.transform.position.x, wrist.transform.position.y, wrist.transform.position.z) : null;
+        if (wrist) {
+          const o = wrist.transform.orientation;
+          p.wristQuat = (p.wristQuat ?? new Quaternion()).set(o.x, o.y, o.z, o.w);
+        } else p.wristQuat = null;
+        p.gamepad = null;
         p.active = true;
         if (this.showJoints) {
           for (const j of JOINTS) {
@@ -120,6 +129,8 @@ export class HandTracker {
         p.pinchPoint.copy(tip);
         p.indexTip = (p.indexTip ?? new Vector3()).copy(tip);
         p.wrist = null;
+        p.wristQuat = (p.wristQuat ?? new Quaternion()).copy(tmpQ);
+        p.gamepad = src.gamepad ?? null;
         const trig = src.gamepad?.buttons[0];
         p.pinching = !!trig && (trig.pressed || trig.value > 0.6);
         p.strength = trig?.value ?? 0;

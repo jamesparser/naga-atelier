@@ -75,6 +75,8 @@ export function executeCommand(model: VoxelModel, cmd: BuildCommand): ExecResult
       model.commit('scale', ch);
       return { ok: true };
     }
+    case 'game':
+      return { ok: false, speech: 'Game commands are handled by the game mode.' };
     case 'rotate': {
       const keys = model.resolveTarget(cmd.target);
       if (!keys.length) return { ok: false, speech: 'There is nothing to rotate yet.' };

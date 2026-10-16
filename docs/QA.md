@@ -22,3 +22,10 @@
 - [ ] English only, no third-party logos
 - [ ] Captions for every voice line
 - [ ] A new user reaches the first "wow" within 2 minutes, without help
+
+## Tetris mode
+- [ ] Dock T-block button / "let's play Tetris" starts a game, "back to building" restores the desk untouched
+- [ ] Pinch-steer feels 1:1; twisting the wrist flips reliably without accidental flips while steering
+- [ ] Flick down hard-drops; pinch-tap spins; the dock flip buttons work by poking
+- [ ] Line clear sparkles + sound; full layer gives a bigger burst and "Full layer!"
+- [ ] Top of the well comfortably visible while seated; 60 fps during clears

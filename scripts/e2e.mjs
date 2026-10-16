@@ -104,15 +104,17 @@ async function drag(from, to, side = 'right') {
 await page.evaluate(() => { const d = window.__iwer; d.hands.left.position.set(-0.6, 0.5, 0.3); });
 await measurePinchOffset();
 console.log('      pinch offset', pinchOffset.map((v) => v.toFixed(3)).join(','));
-await drag([0, 0, 0], [3, 0, 2]);
-check('pinch-drag snaps starter block to new cell', (await has(3, 0, 2)) && !(await has(0, 0, 0)));
+const starter = await page.evaluate(() => [...window.__naga.model.cells.keys()][0].split(',').map(Number));
+const dest = [starter[0] + 3, 0, starter[2] + 2];
+await drag(starter, dest);
+check('pinch-drag snaps starter block to new cell', (await has(...dest)) && !(await has(...starter)), `${starter} -> ${dest}`);
 await shot('01-dragged');
 
 // --- 2. agent: build a small house (text path through the real endpoint) ---
 await page.evaluate(() => window.__naga.say('Build a small house on the desk'));
 await wait(1200);
 const n = await size();
-check('agent built house_small', n === 186, `blocks=${n}`);
+check('agent built house_small (moved starter block kept)', n === 186, `blocks=${n}`);
 await shot('02-house');
 
 // find the roof
@@ -182,6 +184,40 @@ await wait(2500);
 const st = await page.evaluate(() => window.__naga.stats());
 check('heavy scene draw calls within budget (≤40)', st.calls <= 40, JSON.stringify(st));
 await shot('09-heavy');
+
+// --- 10. Tetris mode: steer with a pinch, twist to flip, flick to drop, clear a line -----
+await page.evaluate(() => { window.__naga.apply({ v: 1, type: 'clear' }); window.__naga.setMode('game'); });
+await wait(600);
+check('tetris mode active with a falling piece', await page.evaluate(() => window.__naga.mode() === 'game' && !!window.__naga.tetris.game.piece));
+// freeze gravity for a deterministic test
+await page.evaluate(() => { const g = window.__naga.tetris.game; g.board.clear(); g.setPiece('T', [4, 9, 1]); Object.defineProperty(g, 'fallInterval', { get: () => 1e9, configurable: true }); });
+const pw = (x, y, z) => page.evaluate(([x, y, z]) => window.__naga.deskToWorld(x - 5, y, z - 2), [x, y, z]);
+const pieceState = () => page.evaluate(() => { const p = window.__naga.tetris.game.piece; return p ? { pos: p.pos, cells: JSON.stringify(p.cells) } : null; });
+const start = await pw(4, 9, 1);
+await pinch(0); await aim(start); await pinch(1); await wait(300);
+for (let i = 1; i <= 6; i++) await handTo([start[0] + 0.12 * i / 6, start[1], start[2]]);
+let ps = await pieceState();
+check('pinch-drag steers the piece right by ~3 cells', ps.pos[0] >= 6, JSON.stringify(ps.pos));
+const cellsBefore = ps.cells;
+// twist the wrist ~75° around the axis pointing at the user (roll)
+await page.evaluate(() => { const h = window.__iwer.hands.right; const a = 1.3 / 2; h.quaternion.x = 0; h.quaternion.y = 0; h.quaternion.z = Math.sin(a); h.quaternion.w = Math.cos(a); });
+await wait(600);
+ps = await pieceState();
+check('wrist twist flips the piece', ps.cells !== cellsBefore, ps.cells);
+await page.evaluate(() => { const h = window.__iwer.hands.right; h.quaternion.x = 0; h.quaternion.y = 0; h.quaternion.z = 0; h.quaternion.w = 1; });
+await pinch(0); await wait(400);
+// fill row y=0,z=1 except where an I piece will land, then drop it
+await page.evaluate(() => { const g = window.__naga.tetris.game; g.board.clear(); const cells = []; for (let x = 4; x < 10; x++) cells.push([[x, 0, 1], 'stone']); g.setCells(cells); g.setPiece('I', [1, 6, 1]); });
+await page.evaluate(() => window.__naga.tetris.action('drop'));
+await wait(300);
+const t = await page.evaluate(() => ({ lines: window.__naga.tetris.game.lines, score: window.__naga.tetris.game.score, board: window.__naga.tetris.game.board.size }));
+check('dropping the I completes a line that clears', t.lines === 1 && t.board === 0, JSON.stringify(t));
+await shot('10-tetris-clear');
+await wait(200);
+await shot('11-tetris-sparkles');
+await page.evaluate(() => window.__naga.say('back to building'));
+await wait(800);
+check('voice returns to build mode', (await page.evaluate(() => window.__naga.mode())) === 'build');
 
 check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 await browser.close();

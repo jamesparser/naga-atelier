@@ -19,7 +19,37 @@ import type { PaletteName } from '../../shared/protocol.js';
 import { PALETTE, SWATCHES } from '../blocks/palette.js';
 import { deskHalfD } from '../scene/desk.js';
 
-export type DockAction = 'mic' | 'undo' | 'redo' | 'magic' | 'export' | 'grid' | 'recenter' | `swatch:${PaletteName}`;
+export type DockAction =
+  | 'mic' | 'undo' | 'redo' | 'magic' | 'export' | 'grid' | 'recenter' | 'game' | `swatch:${PaletteName}`
+  // Tetris mode
+  | 'spin' | 'flip' | 'tilt' | 'drop' | 'pause' | 'exit';
+
+const BIG = 0.024;
+const SMALL = 0.0145;
+
+/** Build-mode dock. */
+export const BUILD_LAYOUT: Array<[DockAction, number]> = [
+  ['mic', BIG],
+  ['undo', BIG],
+  ['redo', BIG],
+  ...SWATCHES.map((s) => [`swatch:${s}`, SMALL] as [DockAction, number]),
+  ['magic', BIG],
+  ['export', 0.018],
+  ['grid', 0.018],
+  ['game', 0.018],
+  ['recenter', BIG],
+];
+
+/** Tetris-mode dock: big flip buttons on the left hand side, drop on the right. */
+export const GAME_LAYOUT: Array<[DockAction, number]> = [
+  ['exit', BIG],
+  ['tilt', 0.028],
+  ['flip', 0.028],
+  ['spin', 0.028],
+  ['drop', 0.03],
+  ['pause', BIG],
+  ['mic', BIG],
+];
 
 interface Button {
   id: DockAction;
@@ -46,25 +76,14 @@ export class Dock {
   private activeSwatch: PaletteName = 'oak';
   private micState: 'idle' | 'listening' | 'thinking' | 'off' = 'idle';
 
-  constructor() {
+  constructor(layout: Array<[DockAction, number]> = BUILD_LAYOUT) {
     this.root.name = 'dock';
-    const big = 0.024, small = 0.0145;
-    const layout: Array<[DockAction, number]> = [
-      ['mic', big],
-      ['undo', big],
-      ['redo', big],
-      ...SWATCHES.map((s) => [`swatch:${s}`, small] as [DockAction, number]),
-      ['magic', big],
-      ['export', 0.018],
-      ['grid', 0.018],
-      ['recenter', big],
-    ];
     const gap = 0.012;
     const total = layout.reduce((a, [, r]) => a + 2 * r + gap, -gap);
     let x = -total / 2;
     for (const [id, r] of layout) {
       x += r;
-      this.buttons.push(this.makeButton(id, r, new Vector3(x, 0, ROW_Z + (r === small ? -0.006 : 0))));
+      this.buttons.push(this.makeButton(id, r, new Vector3(x, 0, ROW_Z + (r === SMALL ? -0.006 : 0))));
       x += r + gap;
     }
     this.setActiveSwatch('oak');
@@ -238,6 +257,41 @@ function iconTexture(id: DockAction): CanvasTexture {
       g.strokeRect(24, 24, 80, 80);
       g.strokeRect(44, 44, 40, 40);
       g.strokeRect(58, 58, 12, 12);
+      break;
+    case 'game': {
+      // a little T-tetromino
+      const u = 22;
+      g.fillRect(64 - 1.5 * u, 40, 3 * u - 3, u - 3);
+      g.fillRect(64 - 0.5 * u, 40 + u, u - 3, u - 3);
+      break;
+    }
+    case 'spin': // turn around the vertical axis: flat ellipse with arrow
+      g.beginPath(); g.ellipse(64, 70, 42, 18, 0, Math.PI * 0.1, Math.PI * 1.9); g.stroke();
+      g.beginPath(); g.moveTo(98, 52); g.lineTo(112, 72); g.lineTo(90, 76); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(64, 20); g.lineTo(64, 104); g.stroke();
+      break;
+    case 'flip': // tumble toward you: tall ellipse with arrow
+      g.beginPath(); g.ellipse(64, 64, 18, 42, 0, Math.PI * 0.6, Math.PI * 2.4); g.stroke();
+      g.beginPath(); g.moveTo(46, 30); g.lineTo(66, 16); g.lineTo(70, 40); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(20, 64); g.lineTo(108, 64); g.stroke();
+      break;
+    case 'tilt': // roll left/right: circle with arrow
+      g.beginPath(); g.arc(64, 64, 38, Math.PI * 1.2, Math.PI * 2.9); g.stroke();
+      g.beginPath(); g.moveTo(26, 30); g.lineTo(40, 52); g.lineTo(18, 56); g.closePath(); g.fill();
+      g.fillRect(52, 52, 24, 24);
+      break;
+    case 'drop':
+      g.beginPath(); g.moveTo(64, 18); g.lineTo(64, 78); g.stroke();
+      g.beginPath(); g.moveTo(40, 64); g.lineTo(64, 92); g.lineTo(88, 64); g.closePath(); g.fill();
+      g.fillRect(30, 102, 68, 9);
+      break;
+    case 'pause':
+      g.fillRect(42, 32, 16, 64); g.fillRect(70, 32, 16, 64);
+      break;
+    case 'exit': // little house = back to build mode
+      g.beginPath(); g.moveTo(24, 64); g.lineTo(64, 26); g.lineTo(104, 64); g.closePath(); g.fill();
+      g.fillRect(36, 62, 56, 40);
+      g.clearRect(56, 76, 16, 26);
       break;
     case 'recenter':
       g.beginPath(); g.arc(64, 64, 30, 0, Math.PI * 2); g.stroke();
