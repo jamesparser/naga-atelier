@@ -38,19 +38,35 @@ Everything sits within about 60 cm of a seated user, and the dock is in the lowe
 
 ## Tetris mode
 
-Tap the **T-block** button on the dock (or say **“let's play Tetris”**) and the desk turns into a 10 × 4 × 14 glass well.
+Tap **TETRIS** on the mode bar (or say **“let's play Tetris”**) and the desk turns into a 10 × 4 × 14 neon well.
+The room dims, a hue-cycling vector tunnel and a warp starfield stream out behind the well, and a synthwave loop speeds up with every level.
 The same cube blocks fall as the seven classic tetrominoes. Fill a straight row from left to right and it blows up
 in sparkles. Fill a whole layer and you get a big bonus. Blocks above a cleared row fall into its slice.
 
 | Hands | Controller (optional) | Keyboard (desktop) |
 |---|---|---|
-| Pinch anywhere and move: steer left/right and toward/away | Thumbstick | Arrows / WASD |
-| Pinch and twist your wrist about 50°: flip about that axis | A/X spin · B/Y flip · grip tilt | Q/E spin · R flip · F tilt |
+| Pinch anywhere and move: steer left/right and toward/away | Thumbstick | ← → move · W/S depth |
+| Pinch and twist your wrist about 50°: flip about that axis | A/X spin · B/Y flip · stick-click tilt | ↑ rotate · R flip · F tilt |
 | Quick pinch-tap: spin | | |
-| Pinch and pull down: soft drop · flick down fast: hard drop | Stick click: hard drop | Shift soft · Enter hard |
+| Pinch and pull down: soft drop · flick down fast: hard drop | **Hold grip: fast fall** · **trigger: slam** | ↓ soft drop · **Space** hard drop |
 | Dock: tilt · flip · spin · drop · pause · back to build (house) | | P pause · Esc exit |
 
 Your build desk is untouched while you play. Say **“back to building”** to return to it. Your best score is saved on the device.
+
+## Sling mode
+
+Tap **SLING** on the mode bar (left edge of the desk), or say **“slingshot”**. A tabletop physics puzzle appears:
+pull back the slingshot, let a glowing pebble fly, and knock down glass, wood and stone towers to pop the purple
+*gloomlings* hiding in them. There are **6 levels** (First flight → Sky castle), 3 stars each, and progress is saved on the device.
+
+- **Hands:** pinch (on the pebble or anywhere), pull back toward you, release. The dotted arc shows where it will go.
+- **Controller:** hold the trigger, pull back, let go.
+- **Look from any angle:** lean in or walk around, or use the dock to **turn the arena** 45° left/right and **zoom** (1.15× ↔ 1.8×).
+- **Dock:** back to build · retry · next level · turn left · turn right · zoom · mic.
+- **Desktop:** left-drag to pull (wheel while pulling aims higher), right-drag to orbit, R retry, N next, Q/E turn, Z zoom.
+
+The physics (cannon-es) is simulated at full scale (1 m blocks) and rendered at 1:10, so towers fall with real weight.
+Glass shatters easily, wood takes a few hits, stone is tough. Every level is unit-tested to stand still until hit and not collapse on its own.
 
 ## Voice commands
 

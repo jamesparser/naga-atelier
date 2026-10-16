@@ -22,7 +22,11 @@ import { deskHalfD } from '../scene/desk.js';
 export type DockAction =
   | 'mic' | 'undo' | 'redo' | 'magic' | 'export' | 'grid' | 'recenter' | 'game' | `swatch:${PaletteName}`
   // Tetris mode
-  | 'spin' | 'flip' | 'tilt' | 'drop' | 'pause' | 'exit';
+  | 'spin' | 'flip' | 'tilt' | 'drop' | 'pause' | 'exit'
+  // Sling mode
+  | 'retry' | 'next' | 'turnL' | 'turnR' | 'zoom'
+  // mode bar
+  | 'build' | 'sling';
 
 const BIG = 0.024;
 const SMALL = 0.0145;
@@ -36,8 +40,25 @@ export const BUILD_LAYOUT: Array<[DockAction, number]> = [
   ['magic', BIG],
   ['export', 0.018],
   ['grid', 0.018],
-  ['game', 0.018],
   ['recenter', BIG],
+];
+
+/** Sling-mode dock. */
+export const SLING_LAYOUT: Array<[DockAction, number]> = [
+  ['exit', BIG],
+  ['retry', BIG],
+  ['next', BIG],
+  ['turnL', BIG],
+  ['turnR', BIG],
+  ['zoom', BIG],
+  ['mic', BIG],
+];
+
+/** Mode switcher: a short column on the left edge of the desk, visible in every mode. */
+export const MODE_LAYOUT: Array<[DockAction, number]> = [
+  ['build', 0.02],
+  ['game', 0.02],
+  ['sling', 0.02],
 ];
 
 /** Tetris-mode dock: big flip buttons on the left hand side, drop on the right. */
@@ -74,19 +95,39 @@ export class Dock {
   readonly root = new Group();
   private buttons: Button[] = [];
   private activeSwatch: PaletteName = 'oak';
+  private selected: DockAction | null = null;
   private micState: 'idle' | 'listening' | 'thinking' | 'off' = 'idle';
 
-  constructor(layout: Array<[DockAction, number]> = BUILD_LAYOUT) {
+  /** `column`: lay the buttons out front-to-back at this desk-local x instead of along the front edge. */
+  constructor(layout: Array<[DockAction, number]> = BUILD_LAYOUT, column?: { x: number; zFront: number; labels?: Partial<Record<DockAction, string>> }) {
     this.root.name = 'dock';
     const gap = 0.012;
     const total = layout.reduce((a, [, r]) => a + 2 * r + gap, -gap);
     let x = -total / 2;
+    let z = column ? column.zFront : 0;
     for (const [id, r] of layout) {
+      if (column) {
+        z -= r;
+        this.buttons.push(this.makeButton(id, r, new Vector3(column.x, 0, z)));
+        const text = column.labels?.[id];
+        if (text) {
+          const lab = labelMesh(text);
+          lab.position.set(column.x - r - 0.034, 0.002, z);
+          this.root.add(lab);
+        }
+        z -= r + gap;
+        continue;
+      }
       x += r;
       this.buttons.push(this.makeButton(id, r, new Vector3(x, 0, ROW_Z + (r === SMALL ? -0.006 : 0))));
       x += r + gap;
     }
     this.setActiveSwatch('oak');
+  }
+
+  /** Highlight one button permanently (e.g. the current mode). */
+  setSelected(id: DockAction | null): void {
+    this.selected = id;
   }
 
   private makeButton(id: DockAction, radius: number, pos: Vector3): Button {
@@ -189,7 +230,7 @@ export class Dock {
     const ringMat = b.ring.material as MeshBasicMaterial;
     const isActiveSwatch = b.id === `swatch:${this.activeSwatch}`;
     let ringOpacity = hovered ? 0.6 : 0;
-    if (isActiveSwatch) ringOpacity = 0.95;
+    if (isActiveSwatch || b.id === this.selected) ringOpacity = 0.95;
     if (b.attention) ringOpacity = 0.5 + 0.5 * Math.sin(now / 160);
     ringMat.opacity = ringOpacity;
     b.ring.visible = ringOpacity > 0.01;
@@ -204,6 +245,29 @@ export class Dock {
       b.base.emissive.setHex(hovered ? 0x1a3346 : 0x000000);
     }
   }
+}
+
+/** Small flat text label lying on the desk. */
+function labelMesh(text: string): Mesh {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 64;
+  const g = c.getContext('2d')!;
+  g.font = '700 40px system-ui, sans-serif';
+  g.textAlign = 'right';
+  g.textBaseline = 'middle';
+  g.fillStyle = 'rgba(10,18,28,0.6)';
+  const w = g.measureText(text).width + 24;
+  g.beginPath();
+  g.roundRect(256 - w, 6, w, 52, 14);
+  g.fill();
+  g.fillStyle = '#eaf6ff';
+  g.fillText(text, 244, 33);
+  const tex = new CanvasTexture(c);
+  tex.colorSpace = SRGBColorSpace;
+  const m = new Mesh(new PlaneGeometry(0.064, 0.016), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2;
+  return m;
 }
 
 const iconCache = new Map<string, CanvasTexture>();
@@ -288,6 +352,35 @@ function iconTexture(id: DockAction): CanvasTexture {
     case 'pause':
       g.fillRect(42, 32, 16, 64); g.fillRect(70, 32, 16, 64);
       break;
+    case 'sling': // Y-shaped fork with a band
+      g.beginPath(); g.moveTo(64, 112); g.lineTo(64, 66); g.lineTo(34, 24); g.moveTo(64, 66); g.lineTo(94, 24); g.stroke();
+      g.lineWidth = 5; g.beginPath(); g.moveTo(34, 26); g.quadraticCurveTo(64, 70, 94, 26); g.stroke();
+      g.beginPath(); g.arc(64, 52, 10, 0, Math.PI * 2); g.fill();
+      break;
+    case 'retry':
+      g.beginPath(); g.arc(64, 64, 34, Math.PI * 0.35, Math.PI * 1.95); g.stroke();
+      g.beginPath(); g.moveTo(94, 30); g.lineTo(100, 62); g.lineTo(72, 48); g.closePath(); g.fill();
+      break;
+    case 'next':
+      g.beginPath(); g.moveTo(34, 30); g.lineTo(78, 64); g.lineTo(34, 98); g.closePath(); g.fill();
+      g.fillRect(84, 30, 12, 68);
+      break;
+    case 'turnL':
+    case 'turnR': {
+      g.save();
+      if (id === 'turnR') { g.translate(128, 0); g.scale(-1, 1); }
+      g.beginPath(); g.ellipse(64, 72, 42, 20, 0, Math.PI * 0.05, Math.PI * 1.3); g.stroke();
+      g.beginPath(); g.moveTo(14, 56); g.lineTo(34, 78); g.lineTo(42, 52); g.closePath(); g.fill();
+      g.fillRect(52, 30, 24, 30);
+      g.restore();
+      break;
+    }
+    case 'zoom':
+      g.beginPath(); g.arc(56, 56, 28, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(76, 76); g.lineTo(106, 106); g.stroke();
+      g.beginPath(); g.moveTo(44, 56); g.lineTo(68, 56); g.moveTo(56, 44); g.lineTo(56, 68); g.stroke();
+      break;
+    case 'build':
     case 'exit': // little house = back to build mode
       g.beginPath(); g.moveTo(24, 64); g.lineTo(64, 26); g.lineTo(104, 64); g.closePath(); g.fill();
       g.fillRect(36, 62, 56, 40);

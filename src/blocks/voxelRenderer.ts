@@ -15,6 +15,7 @@ import {
   Quaternion,
   SRGBColorSpace,
   Vector3,
+  type Material,
   type Object3D,
 } from 'three';
 import { CELL, MAX_VOXELS } from '../config.js';
@@ -81,8 +82,8 @@ export class VoxelRenderer {
   private anims = new Map<string, Anim>();
   private glowUntil = new Map<string, number>();
 
-  constructor(private model: VoxelModel, parent: Object3D, shadows: boolean) {
-    this.mesh = new InstancedMesh(blockGeometry(), blockMaterial(), MAX_VOXELS);
+  constructor(private model: VoxelModel, parent: Object3D, shadows: boolean, material: Material = blockMaterial(), capacity = MAX_VOXELS) {
+    this.mesh = new InstancedMesh(blockGeometry(), material, capacity);
     this.mesh.instanceMatrix.setUsage(DynamicDrawUsage);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
@@ -177,8 +178,8 @@ export class CarryMesh {
   readonly group = new Group();
   private mesh: InstancedMesh;
 
-  constructor(parent: Object3D, shadows: boolean) {
-    this.mesh = new InstancedMesh(blockGeometry(), blockMaterial(), MAX_VOXELS);
+  constructor(parent: Object3D, shadows: boolean, material: Material = blockMaterial(), capacity = MAX_VOXELS) {
+    this.mesh = new InstancedMesh(blockGeometry(), material, capacity);
     this.mesh.frustumCulled = false;
     this.mesh.castShadow = shadows;
     this.mesh.count = 0;

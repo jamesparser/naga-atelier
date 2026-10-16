@@ -219,6 +219,24 @@ await page.evaluate(() => window.__naga.say('back to building'));
 await wait(800);
 check('voice returns to build mode', (await page.evaluate(() => window.__naga.mode())) === 'build');
 
+// --- 11. Sling mode: pinch the pebble, pull back toward you, release to launch -------------
+await page.evaluate(() => window.__naga.setMode('sling'));
+await wait(800);
+check('sling mode active, level 1 aiming', await page.evaluate(() => { const s = window.__naga.sling.debugState(); return window.__naga.mode() === 'sling' && s.level >= 1 && s.state === 'aiming'; }));
+const pouch = await page.evaluate(() => window.__naga.sling.arenaToWorld(0, 0.9, 1.6));
+await pinch(0); await wait(200);
+await aim(pouch);
+await pinch(1); await wait(300);
+// pull back (toward the user = +z in desk space) and a little down
+const deskBack = await page.evaluate(() => { const a = window.__naga.sling.arenaToWorld(0, 0.9, 1.6); const b = window.__naga.sling.arenaToWorld(0, 0.35, 2.6); return [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; });
+for (let i = 1; i <= 6; i++) await handTo([pouch[0] + deskBack[0] * i / 6, pouch[1] + deskBack[1] * i / 6, pouch[2] + deskBack[2] * i / 6]);
+await pinch(0); await wait(600);
+const sl = await page.evaluate(() => window.__naga.sling.debugState());
+check('pinch-pull-release launches the pebble', sl.state === 'flying' || sl.state === 'settling', JSON.stringify(sl));
+check('pebble flies away from the player', !!sl.bird && sl.bird[2] < 1.6, JSON.stringify(sl.bird));
+await shot('12-sling-flight');
+await page.evaluate(() => window.__naga.setMode('build'));
+
 check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 await browser.close();
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASSED');

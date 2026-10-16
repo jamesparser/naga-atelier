@@ -29,3 +29,11 @@
 - [ ] Flick down hard-drops; pinch-tap spins; the dock flip buttons work by poking
 - [ ] Line clear sparkles + sound; full layer gives a bigger burst and "Full layer!"
 - [ ] Top of the well comfortably visible while seated; 60 fps during clears
+- [ ] Neon look reads well over passthrough (hands still visible through the dimmed room); music volume OK; 60 fps with tunnel + stars
+- [ ] Controller: hold grip = fast fall, trigger = slam, A/X spin, B/Y flip
+
+## Sling mode
+- [ ] SLING on the mode bar / "slingshot" opens level 1; pinch-pull-release launches reliably with hands and with a controller trigger
+- [ ] Trajectory dots match the flight; glass shatters, wood breaks after hits, stone survives light hits
+- [ ] Gloomlings pop with sparkles; level-cleared message, stars, next level; retry works
+- [ ] Turn arena / zoom buttons give a good view from the side; 60 fps during big collapses (level 6)

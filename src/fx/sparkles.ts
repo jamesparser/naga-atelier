@@ -19,7 +19,9 @@ import {
 
 const MAX = 1400;
 
-function dotTexture(): CanvasTexture {
+let dotTex: CanvasTexture | null = null;
+export function dotTexture(): CanvasTexture {
+  if (dotTex) return dotTex;
   const c = document.createElement('canvas');
   c.width = c.height = 64;
   const g = c.getContext('2d')!;
@@ -35,7 +37,8 @@ function dotTexture(): CanvasTexture {
   g.beginPath();
   g.moveTo(32, 2); g.lineTo(32, 62); g.moveTo(2, 32); g.lineTo(62, 32);
   g.stroke();
-  return new CanvasTexture(c);
+  dotTex = new CanvasTexture(c);
+  return dotTex;
 }
 
 export class Sparkles {

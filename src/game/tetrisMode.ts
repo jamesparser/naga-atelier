@@ -11,6 +11,8 @@
  * Controller (optional): thumbstick steer · A/X spin · B/Y flip · grip tilt · stick-click drop
  */
 import {
+  AdditiveBlending,
+  Color,
   BufferGeometry,
   CanvasTexture,
   Float32BufferAttribute,
@@ -32,6 +34,8 @@ import { VoxelModel, key, type Cell } from '../blocks/voxelModel.js';
 import { CarryMesh, GhostMesh, VoxelRenderer, cellCenter } from '../blocks/voxelRenderer.js';
 import { Dock, GAME_LAYOUT, type DockAction } from '../ui/dock.js';
 import { Sparkles } from '../fx/sparkles.js';
+import { NeonStage, neonMaterial } from './neonStage.js';
+import { SynthMusic } from '../audio/music.js';
 import type { Pointer } from '../hands/handInput.js';
 import { Tetris3D, WELL_D, WELL_H, WELL_W, type Axis, type Piece, type TetrisEvent, type V3 } from './tetris.js';
 
@@ -61,6 +65,8 @@ interface Grab {
 
 export interface TetrisHost {
   say(text: string): void;
+  /** true when the headset shows passthrough (dims the room less) */
+  passthrough?(): boolean;
   celebrate(): void;
   exit(): void;
   mic(): void;
@@ -86,20 +92,24 @@ export class TetrisMode {
   private shownNext = '';
   private grabs = new Map<number, Grab>();
   private wasPinching = new Map<number, boolean>();
-  private pads = new Map<number, { buttons: boolean[]; repeatAt: number; dir: string }>();
+  private pads = new Map<number, { buttons: boolean[]; repeatAt: number; dir: string; softAt?: number }>();
   private panel: { canvas: HTMLCanvasElement; tex: CanvasTexture; mesh: Mesh; last: string };
   private best = 0;
+  private stage: NeonStage;
+  private music = new SynthMusic();
+  private neon = neonMaterial();
   active = false;
 
-  constructor(private deskRoot: Object3D, shadows: boolean, private host: TetrisHost) {
+  constructor(private deskRoot: Object3D, _shadows: boolean, private host: TetrisHost) {
     this.root.name = 'tetris';
     this.root.visible = false;
     deskRoot.add(this.root);
     this.s = TCELL / CELL;
     this.well.scale.setScalar(this.s);
     this.root.add(this.well);
-    this.boardRenderer = new VoxelRenderer(this.boardModel, this.well, shadows);
-    this.pieceMesh = new CarryMesh(this.well, shadows);
+    // Neon look: glowing-rim glass cubes that share one hue-cycling material.
+    this.boardRenderer = new VoxelRenderer(this.boardModel, this.well, false, this.neon, 800);
+    this.pieceMesh = new CarryMesh(this.well, false, this.neon, 8);
     this.ghost = new GhostMesh(this.well);
     this.sparkles = new Sparkles(this.well);
     this.root.add(this.dock.root);
@@ -117,9 +127,9 @@ export class TetrisMode {
     for (let z = 1; z < WELL_D; z++) seg([x0, 0.001, z0 + z * CELL], [x1, 0.001, z0 + z * CELL]);
     const fg = new BufferGeometry();
     fg.setAttribute('position', new Float32BufferAttribute(e, 3));
-    this.frameMat = new LineBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: 0.55 });
+    this.frameMat = new LineBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: 0.9, blending: AdditiveBlending, depthWrite: false });
     this.well.add(new LineSegments(fg, this.frameMat));
-    const glass = new MeshBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: 0.05, depthWrite: false });
+    const glass = new MeshBasicMaterial({ color: 0x3a1a6a, transparent: true, opacity: 0.16, depthWrite: false });
     const back = new Mesh(new PlaneGeometry(x1 - x0, h), glass);
     back.position.set((x0 + x1) / 2, h / 2, z0);
     const left = new Mesh(new PlaneGeometry(z1 - z0, h), glass);
@@ -127,7 +137,7 @@ export class TetrisMode {
     left.position.set(x0, h / 2, (z0 + z1) / 2);
     const right = left.clone();
     right.position.x = x1;
-    const floor = new Mesh(new PlaneGeometry(x1 - x0, z1 - z0), new MeshBasicMaterial({ color: 0x0b2233, transparent: true, opacity: 0.35, depthWrite: false }));
+    const floor = new Mesh(new PlaneGeometry(x1 - x0, z1 - z0), new MeshBasicMaterial({ color: 0x12002a, transparent: true, opacity: 0.6, depthWrite: false }));
     floor.rotation.x = -Math.PI / 2;
     floor.position.set((x0 + x1) / 2, 0.0008, (z0 + z1) / 2);
     this.well.add(back, left, right, floor);
@@ -145,9 +155,12 @@ export class TetrisMode {
     mesh.renderOrder = 12;
     this.root.add(mesh);
     this.panel = { canvas, tex, mesh, last: '' };
-    this.nextMesh = new CarryMesh(this.root, false);
+    this.nextMesh = new CarryMesh(this.root, false, this.neon, 8);
     this.nextMesh.group.position.set(X1 + 0.11, 0.31, Z0 + 0.03);
     this.nextMesh.group.scale.setScalar(0.7 * this.s);
+
+    this.stage = new NeonStage(OX * TCELL, (OX + WELL_W) * TCELL, WELL_H * TCELL, OZ * TCELL);
+    this.root.add(this.stage.root);
 
     try {
       this.best = Number(localStorage.getItem(BEST_KEY) ?? 0) || 0;
@@ -162,12 +175,15 @@ export class TetrisMode {
     this.root.visible = true;
     this.grabs.clear();
     this.game.start();
+    this.stage.setPassthrough(this.host.passthrough?.() ?? false);
+    this.music.start(sfx.ctx, 1);
     this.host.say('Tetris! Pinch to steer, twist your wrist to flip, flick down to drop.');
   }
 
   exit(): void {
     this.active = false;
     this.root.visible = false;
+    this.music.stop();
     this.game.state = 'ready';
     this.pieceMesh.hide();
     this.ghost.hide();
@@ -180,6 +196,7 @@ export class TetrisMode {
     const g = this.game;
     if (g.state === 'over' && (a === 'drop' || a === 'spin')) {
       g.start();
+      this.music.start(sfx.ctx, 1);
       this.host.say('New game. Good luck!');
       return;
     }
@@ -195,6 +212,8 @@ export class TetrisMode {
       case 'down': g.move(0, -1, 0); break;
       case 'pause':
         g.pause(g.state === 'playing');
+        if (g.state === 'paused') this.music.stop();
+        else this.music.start(sfx.ctx, g.level);
         sfx.play('click');
         this.host.say(g.state === 'paused' ? 'Paused.' : 'Go!');
         break;
@@ -207,8 +226,11 @@ export class TetrisMode {
   /** Desktop keyboard. Returns true when the key was used. */
   key(k: string): boolean {
     const map: Record<string, Parameters<TetrisMode['action']>[0]> = {
-      ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right', ArrowUp: 'away', w: 'away', ArrowDown: 'closer', s: 'closer',
-      q: 'spin', e: 'spin', r: 'flip', f: 'tilt', Enter: 'drop', Shift: 'down', p: 'pause', Escape: 'exit',
+      // Classic Tetris keys first: ←/→ move, ↑ rotate, ↓ soft drop, Space hard drop.
+      ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'spin', ArrowDown: 'down', ' ': 'drop',
+      // 3D extras: W/S move away/closer, A/D also move, Q/E spin, R flip, F tilt.
+      a: 'left', d: 'right', w: 'away', s: 'closer', q: 'spin', e: 'spin', r: 'flip', f: 'tilt',
+      x: 'down', Enter: 'drop', Shift: 'down', p: 'pause', Escape: 'exit',
     };
     const a = map[k];
     if (!a) return false;
@@ -217,6 +239,7 @@ export class TetrisMode {
   }
 
   pausedByHost(): void {
+    this.music.stop();
     if (this.game.state === 'playing') this.game.pause(true);
   }
 
@@ -251,6 +274,8 @@ export class TetrisMode {
           this.action(hit);
           continue;
         }
+        // Controllers steer with the thumbstick; their trigger is "slam" (handled in handlePad).
+        if (p.kind === 'controller') continue;
         const piece = this.game.piece;
         this.grabs.set(p.id, {
           startLocal: local.clone(),
@@ -345,14 +370,20 @@ export class TetrisMode {
   }
 
   private handlePad(id: number, pad: Gamepad, now: number): void {
-    const st = this.pads.get(id) ?? { buttons: [], repeatAt: 0, dir: '' };
+    const st = this.pads.get(id) ?? { buttons: [], repeatAt: 0, dir: '', softAt: 0 };
     this.pads.set(id, st);
     const pressed = (i: number) => !!pad.buttons[i]?.pressed;
     const edge = (i: number) => pressed(i) && !st.buttons[i];
+    // Quest Touch: 0 trigger · 1 grip · 3 stick click · 4 A/X · 5 B/Y
+    if (edge(0)) this.action('drop'); // trigger = slam it down
     if (edge(4)) this.action('spin');
     if (edge(5)) this.action('flip');
-    if (edge(1)) this.action('tilt');
-    if (edge(3)) this.action('drop');
+    if (edge(3)) this.action('tilt');
+    // Hold grip = fast fall (soft drop), repeating like holding ↓.
+    if (pressed(1) && now >= (st.softAt ?? 0)) {
+      this.action('down');
+      st.softAt = now + 55;
+    }
     st.buttons = pad.buttons.map((b) => b.pressed);
     const ax = pad.axes[2] ?? 0, ay = pad.axes[3] ?? 0;
     const dir = Math.abs(ax) > 0.6 ? (ax < 0 ? 'left' : 'right') : Math.abs(ay) > 0.6 ? (ay < 0 ? 'away' : 'closer') : '';
@@ -390,6 +421,8 @@ export class TetrisMode {
         for (const y of new Set(ev.rows.map((r) => r.y))) {
           this.sparkles.ring(new Vector3(0, (y + 0.5) * CELL, 0), big ? 0xffe6a8 : 0xbfe8ff, WELL_W * CELL * (big ? 0.7 : 0.55));
         }
+        this.stage.pulse(big ? 2 : 0.6 + 0.3 * ev.rows.length);
+        this.music.accent();
         const n = ev.rows.length;
         const word = ev.layers.length ? 'Full layer!' : n >= 4 ? 'TETRIS!' : n === 3 ? 'Triple!' : n === 2 ? 'Double!' : '';
         if (word) this.host.say(`${word} +${ev.points}`);
@@ -398,10 +431,13 @@ export class TetrisMode {
       }
       case 'level':
         sfx.play('levelup');
+        this.music.setLevel(ev.level);
+        this.stage.pulse(1.2);
         this.host.say(`Level ${ev.level} — faster now.`);
         break;
       case 'gameover': {
         sfx.play('gameover');
+        this.music.stop();
         const record = ev.score > this.best;
         if (record) {
           this.best = ev.score;
@@ -462,8 +498,12 @@ export class TetrisMode {
     // Danger tint when the stack nears the rim.
     let top = 0;
     for (const k of g.board.keys()) top = Math.max(top, Number(k.split(',')[1]));
-    this.frameMat.color.setHex(top >= WELL_H - 4 ? 0xff7070 : 0x7fd8ff);
-    this.frameMat.opacity = top >= WELL_H - 4 ? 0.55 + 0.35 * Math.sin(now / 120) : 0.55;
+    const danger = top >= WELL_H - 4;
+    this.stage.update(now, dt, g.level, danger);
+    // hue-cycling neon: frame follows the stage tint, blocks get a softer wash + white flash on clears
+    this.frameMat.color.copy(this.stage.tint);
+    if (danger) this.frameMat.color.lerp(new Color(1, 0.2, 0.25), 0.5 + 0.5 * Math.sin(now / 110));
+    this.neon.color.setRGB(1, 1, 1).lerp(this.stage.tint, 0.28).lerp(new Color(1, 1, 1), Math.min(1, this.stage.flashLevel));
 
     this.sparkles.update(dt);
     this.drawPanel();

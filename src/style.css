@@ -50,3 +50,6 @@ button.ghost.ok { border-color: var(--accent); color: var(--accent); }
 #debug button { padding: 4px 8px; margin: 2px; font-size: 12px; border-radius: 6px; background: #1c2c3c; color: var(--ink); border: 1px solid #2c4256; }
 #debug input, #debug textarea { width: 100%; background: #0b131c; color: var(--ink); border: 1px solid #2c4256; border-radius: 6px; padding: 6px; font: 12px ui-monospace, monospace; }
 #debug .stats { font: 12px ui-monospace, monospace; color: var(--dim); white-space: pre; }
+#legend { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); max-width: calc(100% - 32px); background: rgba(10, 18, 28, 0.82); border: 1px solid rgba(127, 216, 255, 0.25); color: var(--ink); padding: 8px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 4; }
+#legend.show { opacity: 1; }
+#legend b { color: var(--gold); }

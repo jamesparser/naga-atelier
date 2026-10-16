@@ -14,7 +14,9 @@ import {
   Vector2,
   Vector3,
   WebGLRenderer,
+  MOUSE,
 } from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { DEBUG, DESK_BELOW_HEAD, DESK_FORWARD, LOW_FX, QUERY, CELL, GRID_PRESETS, GRID_PRESET_ID, applyGridPreset, nextGridPreset } from './config.js';
 import { sanitizeCommand, BLUEPRINT_IDS, type AgentEnvelope, type BuildCommand, type BlueprintId } from '../shared/protocol.js';
 import { VoxelModel, key } from './blocks/voxelModel.js';
@@ -34,6 +36,9 @@ import { Onboarding } from './onboarding.js';
 import { downloadWorld } from './export/worldExport.js';
 import { mountDebugPanel } from './debug.js';
 import { TetrisMode } from './game/tetrisMode.js';
+import { SlingMode } from './game/slingMode.js';
+import { MODE_LAYOUT } from './ui/dock.js';
+import { DESK_HALF_W, DESK_HALF_D } from './scene/desk.js';
 
 async function boot(): Promise<void> {
   if (QUERY.has('emulate')) {
@@ -198,10 +203,11 @@ function start(): void {
     const b = env.build;
     // Tetris mode: game commands, and in-game "rotate / move left / drop" go to the game.
     if (b?.type === 'game') {
-      if (b.action === 'start') setMode('game');
+      if (b.action === 'start') setMode(b.game === 'sling' ? 'sling' : 'game');
       else if (b.action === 'stop') setMode('build');
-      else if (mode === 'game') tetris.action(b.action === 'drop' ? 'drop' : 'pause');
-      else speech = 'Say “play Tetris” to start a game.';
+      else if (mode === 'game') tetris.action(b.action === 'drop' ? 'drop' : b.action === 'retry' || b.action === 'next' ? 'drop' : 'pause');
+      else if (mode === 'sling') sling.action(b.action === 'next' ? 'next' : 'retry');
+      else speech = 'Say “play Tetris” or “slingshot” to start a game.';
       say(speech, speech === env.speech ? env.audio : null);
       return;
     }
@@ -210,7 +216,7 @@ function start(): void {
       else tetris.action((b.dx ?? 0) < 0 ? 'left' : (b.dx ?? 0) > 0 ? 'right' : (b.dz ?? 0) > 0 ? 'closer' : (b.dz ?? 0) < 0 ? 'away' : 'down');
       return;
     }
-    if (mode === 'game' && b) setMode('build', true); // any build request leaves the game
+    if (mode !== 'build' && b) setMode('build', true); // any build request leaves the game
     if (env.build) {
       if (interaction.busy) {
         pending.push(env.build); // hands win: apply after the drop
@@ -303,6 +309,8 @@ function start(): void {
         apply({ v: 1, type: 'grid' });
         break;
       case 'game': setMode('game'); break;
+      case 'sling': setMode('sling'); break;
+      case 'build': setMode('build'); break;
       case 'recenter':
         sfx.play('click');
         placeDeskNextFrame = true;
@@ -324,33 +332,79 @@ function start(): void {
 
   const interaction = new Interaction(model, voxels, desk, dock, deskRoot, shadows, onInteraction);
 
-  // ------------------------------------------------------------- Tetris mode
-  let mode: 'build' | 'game' = 'build';
-  const tetris = new TetrisMode(deskRoot, shadows, {
-    say: (t) => say(t),
+  // ------------------------------------------------------------- game modes
+  type Mode = 'build' | 'game' | 'sling';
+  let mode: Mode = 'build';
+  const gameHost = {
+    say: (t: string) => say(t),
     celebrate: () => naga.setMood('happy', 1200),
     exit: () => setMode('build'),
     mic: () => void onMic(),
-  });
-  function setMode(next: 'build' | 'game', quiet = false): void {
+    passthrough: () => !!session && xrMode === 'immersive-ar',
+  };
+  const tetris = new TetrisMode(deskRoot, shadows, gameHost);
+  const sling = new SlingMode(deskRoot, shadows, gameHost);
+  // Mode switcher on the left edge of the desk: build · tetris · sling, always reachable.
+  const modeBar = new Dock(MODE_LAYOUT, { x: -DESK_HALF_W - 0.045, zFront: DESK_HALF_D + 0.03, labels: { build: 'BUILD', game: 'TETRIS', sling: 'SLING' } });
+  modeBar.setSelected('build');
+  deskRoot.add(modeBar.root);
+  const modeBarPinch = new Map<number, boolean>();
+  const updateModeBar = (now: number) => {
+    const tips = new Map<number, Vector3>();
+    for (const p of hands.pointers) {
+      const was = modeBarPinch.get(p.id) ?? false;
+      modeBarPinch.set(p.id, p.active && p.pinching);
+      if (!p.active) continue;
+      if (p.pinching && !was) {
+        const hit = modeBar.hitTest(deskRoot.worldToLocal(p.pinchPoint.clone()), 0.012);
+        if (hit) {
+          modeBar.flash(hit, now);
+          onDock(hit);
+        }
+      }
+      if (p.indexTip && !p.pinching && p.kind !== 'mouse') tips.set(p.id, deskRoot.worldToLocal(p.indexTip.clone()));
+    }
+    for (const a of modeBar.updatePokes(tips, now)) onDock(a);
+  };
+
+  function setMode(next: Mode, quiet = false): void {
     if (next === mode) return;
+    const prev = mode;
     mode = next;
-    const game = next === 'game';
-    if (game) {
+    modeBar.setSelected(next);
+    if (prev === 'build') {
       interaction.cancelAll();
       onboarding.active = false;
       naga.caption.setHint('');
       dock.setAttention(null);
     }
-    voxels.mesh.visible = !game;
-    dock.root.visible = !game;
-    desk.trash.visible = !game;
+    if (prev === 'game') tetris.exit();
+    if (prev === 'sling') sling.exit();
+    const build = next === 'build';
+    voxels.mesh.visible = build;
+    dock.root.visible = build;
+    desk.trash.visible = build;
+    // Tetris brings its own neon floor; sling keeps the table look.
+    desk.setDecorVisible(next !== 'game', next !== 'game' && !(session && xrMode === 'immersive-ar'));
     sfx.play('chime');
-    if (game) tetris.enter();
-    else {
-      tetris.exit();
-      if (!quiet) say('Back to building. Your desk is just as you left it.');
-    }
+    if (next === 'game') tetris.enter();
+    else if (next === 'sling') sling.enter();
+    else if (!quiet) say('Back to building. Your desk is just as you left it.');
+    showLegend(next);
+  }
+
+  // Desktop-only controls legend (in the headset the dock icons + Naga explain things).
+  const legend = document.createElement('div');
+  legend.id = 'legend';
+  document.body.appendChild(legend);
+  const LEGENDS: Record<Mode, string> = {
+    build: '',
+    game: '<b>Tetris</b> ← → move · ↑ rotate · ↓ soft drop · <b>Space</b> hard drop · W/S depth · R flip · F tilt · P pause · Esc exit',
+    sling: '<b>Sling</b> left-drag to pull back, release to fire · wheel while pulling = aim higher · right-drag to orbit · R retry · N next · Q/E turn arena · Z zoom · Esc exit',
+  };
+  function showLegend(m: Mode): void {
+    legend.innerHTML = session ? '' : LEGENDS[m];
+    legend.classList.toggle('show', !session && !!LEGENDS[m]);
   }
 
   onboarding = new Onboarding({
@@ -409,7 +463,7 @@ function start(): void {
     sfx.unlock();
     const passthrough = xrMode === 'immersive-ar';
     scene.background = passthrough ? null : bg;
-    desk.vrDesk.visible = !passthrough;
+    desk.setDecorVisible(mode !== 'game', mode !== 'game' && !passthrough);
     hands.showJoints = !passthrough;
     await renderer.xr.setSession(s);
     landing.classList.add('hidden');
@@ -571,8 +625,17 @@ function start(): void {
   canvas.addEventListener('pointermove', (ev) => {
     if (!session) setMouse(ev);
   });
+  // Desktop preview camera: right-drag orbits, middle/wheel zooms (left button stays "pinch").
+  const orbit = new OrbitControls(camera, canvas);
+  orbit.target.set(0, 0.84, -0.3);
+  orbit.mouseButtons = { LEFT: null as unknown as MOUSE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE };
+  orbit.enableDamping = true;
+  orbit.minDistance = 0.25;
+  orbit.maxDistance = 2.5;
+  orbit.update();
+  canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
   canvas.addEventListener('pointerdown', (ev) => {
-    if (session) return;
+    if (session || ev.button !== 0) return;
     sfx.unlock();
     setMouse(ev);
     dragPlaneY = deskRoot.worldToLocal(mouse.pinchPoint.clone()).y;
@@ -583,17 +646,29 @@ function start(): void {
     dragPlaneY = null;
   });
   canvas.addEventListener('wheel', (ev) => {
-    if (dragPlaneY !== null) {
+    if (mode === 'sling' && sling.wheel(-ev.deltaY)) {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      return;
+    }
+    if (dragPlaneY !== null && mode === 'build') {
       dragPlaneY = Math.max(0, dragPlaneY - Math.sign(ev.deltaY) * CELL);
       ev.preventDefault();
+      ev.stopImmediatePropagation();
     }
-  }, { passive: false });
+  }, { passive: false, capture: true });
   window.addEventListener('keydown', (ev) => {
     if ((ev.target as HTMLElement).tagName === 'INPUT' || (ev.target as HTMLElement).tagName === 'TEXTAREA') return;
-    if (mode === 'game' && ev.key !== ' ' && tetris.key(ev.key.length === 1 ? ev.key.toLowerCase() : ev.key)) {
+    const k = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
+    if (mode === 'game' && tetris.key(k)) {
       ev.preventDefault();
       return;
     }
+    if (mode === 'sling' && sling.key(k)) {
+      ev.preventDefault();
+      return;
+    }
+    if (mode !== 'build' && k === 'm') { void onMic(); return; }
     if ((ev.ctrlKey || ev.metaKey) && ev.key === 'z') onDock(ev.shiftKey ? 'redo' : 'undo');
     else if (ev.key === ' ') { ev.preventDefault(); void onMic(); }
   });
@@ -627,7 +702,9 @@ function start(): void {
       mouse.active = false;
     }
     if (mode === 'game') tetris.update(hands.pointers, now, dt);
+    else if (mode === 'sling') sling.update(hands.pointers, now, dt);
     else interaction.update(hands.pointers, now);
+    updateModeBar(now);
     while (pending.length && !interaction.busy) apply(pending.shift()!);
     voxels.update(now);
     naga.setLevel(voice.listening ? voice.level : speaker.level);
@@ -635,6 +712,7 @@ function start(): void {
     onboarding.tick(now);
     camPos.setFromMatrixPosition((session ? renderer.xr.getCamera() : camera).matrixWorld);
     hands.faceCursors(camPos);
+    if (!session) orbit.update();
     renderer.render(scene, camera);
   });
 
@@ -660,7 +738,8 @@ function start(): void {
     caption: () => naga.caption,
     interaction,
     tetris,
-    setMode: (m: 'build' | 'game') => setMode(m),
+    sling,
+    setMode: (m: 'build' | 'game' | 'sling') => setMode(m),
     mode: () => mode,
   };
   (window as unknown as { __naga: typeof api }).__naga = api;

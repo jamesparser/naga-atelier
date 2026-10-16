@@ -45,6 +45,8 @@ export interface DeskVisuals {
   trash: Group;
   setTrashHot(hot: boolean): void;
   setGridEmphasis(on: boolean): void;
+  /** Show/hide the build mat, grid and VR desk slab (games bring their own floor). */
+  setDecorVisible(on: boolean, vr: boolean): void;
 }
 
 export function buildDesk(shadows: boolean): DeskVisuals {
@@ -122,6 +124,7 @@ export function buildDesk(shadows: boolean): DeskVisuals {
   root.add(trash);
 
   const discMat = disc.material as MeshBasicMaterial;
+  const decor = [mat, grid, border];
   return {
     root,
     vrDesk,
@@ -129,6 +132,10 @@ export function buildDesk(shadows: boolean): DeskVisuals {
     setTrashHot(hot) {
       discMat.opacity = hot ? 0.45 : 0.12;
       trash.scale.setScalar(hot ? 1.12 : 1);
+    },
+    setDecorVisible(on, vr) {
+      for (const d of decor) d.visible = on;
+      vrDesk.visible = vr;
     },
     setGridEmphasis(on) {
       gridMat.opacity = on ? 0.32 : 0.16;
