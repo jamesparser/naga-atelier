@@ -15,5 +15,5 @@
     "allowImportingTsExtensions": false,
     "types": ["vite/client", "node", "webxr"]
   },
-  "include": ["src", "shared", "api", "tests"]
+  "include": ["src", "shared", "api", "tests", "vite.config.ts"]
 }

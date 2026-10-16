@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description" content="Talk it into the room. Sculpt it with your hands. A hands-first mixed-reality block studio for Meta Quest 3." />
+    <meta name="theme-color" content="#0e1620" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='22' fill='%2358d6c8'/%3E%3C/svg%3E" />
+    <title>Naga Atelier</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <main id="landing" aria-live="polite">
+      <div class="card">
+        <div class="orb" aria-hidden="true"></div>
+        <h1>Naga Atelier</h1>
+        <p class="tag">Talk it into the room. Sculpt it with your hands.</p>
+        <ol class="how">
+          <li><b>Sit</b> at a desk or table.</li>
+          <li><b>Say</b> what to build — Naga drafts it on your desk.</li>
+          <li><b>Pinch</b> to move, tap to add, drop in the bin to delete. No controllers needed.</li>
+        </ol>
+        <div class="actions">
+          <button id="enter" class="primary" disabled>Checking headset…</button>
+          <button id="mic" class="ghost">Allow microphone</button>
+        </div>
+        <p id="status" class="status"></p>
+      </div>
+    </main>
+    <div id="toast" role="status"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

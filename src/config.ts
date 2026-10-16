@@ -21,7 +21,7 @@ export const GRAB_RADIUS = CELL * 0.75 + 0.015;
 /** Movement before a press turns into a drag. */
 export const DRAG_THRESHOLD = 0.012;
 /** Holding still this long on a block detaches it from its cluster. */
-export const HOLD_DETACH_MS = 450;
+export const HOLD_DETACH_MS = 800;
 /** Lift applied to carried blocks so they float just above the hand target. */
 export const CARRY_LIFT = 0.012;
 
