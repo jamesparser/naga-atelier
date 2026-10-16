@@ -9,6 +9,7 @@ import {
   PerspectiveCamera,
   Plane,
   Quaternion,
+  Ray,
   Raycaster,
   Scene,
   Vector2,
@@ -39,7 +40,16 @@ import { mountDebugPanel } from './debug.js';
 import { TetrisMode } from './game/tetrisMode.js';
 import { SlingMode } from './game/slingMode.js';
 import { MODE_LAYOUT } from './ui/dock.js';
-import { ScreenPad, SLING_PAD, TETRIS_PAD } from './ui/screenPad.js';
+import { ARCADE_PAD, ScreenPad, SLING_PAD, TETRIS_PAD } from './ui/screenPad.js';
+import { ARCADE_GAMES, ArcadePicker, type ArcadeId } from './game/arcade.js';
+import type { GameBase } from './game/gameBase.js';
+import { Galago } from './game/galago.js';
+import { MarbleMaze } from './game/marbleMaze.js';
+import { WhackAGloom } from './game/whack.js';
+import { Breakout3D } from './game/breakout.js';
+import { BlockTower } from './game/blockTower.js';
+import { FappyBro } from './game/fappyBro.js';
+import { MikePenguin } from './game/mikePenguin.js';
 import { DESK_HALF_W, DESK_HALF_D } from './scene/desk.js';
 
 async function boot(): Promise<void> {
@@ -205,8 +215,9 @@ function start(): void {
     const b = env.build;
     // Tetris mode: game commands, and in-game "rotate / move left / drop" go to the game.
     if (b?.type === 'game') {
-      if (b.action === 'start') setMode(b.game === 'sling' ? 'sling' : 'game');
+      if (b.action === 'start') setMode(b.game === 'sling' ? 'sling' : b.game && b.game !== 'tetris' ? (b.game as Mode) : 'game');
       else if (b.action === 'stop') setMode('build');
+      else if (currentArcade()) currentArcade()!.action(b.action === 'drop' ? 'fire' : b.action === 'retry' ? 'retry' : b.action === 'next' ? 'next' : 'pause');
       else if (mode === 'game') tetris.action(b.action === 'drop' ? 'drop' : b.action === 'retry' || b.action === 'next' ? 'drop' : 'pause');
       else if (mode === 'sling') sling.action(b.action === 'next' ? 'next' : 'retry');
       else speech = 'Say “play Tetris” or “slingshot” to start a game.';
@@ -313,6 +324,8 @@ function start(): void {
       case 'game': setMode('game'); break;
       case 'sling': setMode('sling'); break;
       case 'build': setMode('build'); break;
+      case 'arcade': setMode('arcade'); break;
+      case 'galago': case 'maze': case 'whack': case 'breakout': case 'tower': case 'fappy': case 'penguin': setMode(action); break;
       case 'recenter':
         sfx.play('click');
         placeDeskNextFrame = true;
@@ -335,8 +348,10 @@ function start(): void {
   const interaction = new Interaction(model, voxels, desk, dock, deskRoot, shadows, onInteraction);
 
   // ------------------------------------------------------------- game modes
-  type Mode = 'build' | 'game' | 'sling';
+  type Mode = 'build' | 'game' | 'sling' | 'arcade' | ArcadeId;
   let mode: Mode = 'build';
+  let lastMouseRay: Ray | null = null;
+  const eyeWorld = new Vector3();
   const gameHost = {
     say: (t: string) => say(t),
     celebrate: () => naga.setMood('happy', 1200),
@@ -344,11 +359,34 @@ function start(): void {
     mic: () => void onMic(),
     passthrough: () => !!session && xrMode === 'immersive-ar',
     depthChanged: () => syncPadState(),
+    eye: () => eyeWorld.setFromMatrixPosition((session ? renderer.xr.getCamera() : camera).matrixWorld),
+    mouseRay: () => (session ? null : lastMouseRay),
   };
+  // Arcade: a picker plus seven mini-games, each built the first time it is opened.
+  const arcadeGames = new Map<string, GameBase>();
+  const arcadeGame = (m: Mode): GameBase | null => {
+    if (m !== 'arcade' && !(ARCADE_GAMES as readonly string[]).includes(m)) return null;
+    let g = arcadeGames.get(m);
+    if (!g) {
+      switch (m as ArcadeId | 'arcade') {
+        case 'arcade': g = new ArcadePicker(deskRoot, gameHost, (id) => setMode(id)); break;
+        case 'galago': g = new Galago(deskRoot, gameHost); break;
+        case 'maze': g = new MarbleMaze(deskRoot, gameHost); break;
+        case 'whack': g = new WhackAGloom(deskRoot, gameHost); break;
+        case 'breakout': g = new Breakout3D(deskRoot, gameHost); break;
+        case 'tower': g = new BlockTower(deskRoot, gameHost); break;
+        case 'fappy': g = new FappyBro(deskRoot, gameHost); break;
+        case 'penguin': g = new MikePenguin(deskRoot, gameHost); break;
+      }
+      arcadeGames.set(m, g!);
+    }
+    return g!;
+  };
+  const currentArcade = (): GameBase | null => (mode === 'arcade' || (ARCADE_GAMES as readonly string[]).includes(mode) ? arcadeGame(mode) : null);
   const tetris = new TetrisMode(deskRoot, shadows, gameHost);
   const sling = new SlingMode(deskRoot, shadows, gameHost);
   // Mode switcher on the left edge of the desk: build · tetris · sling, always reachable.
-  const modeBar = new Dock(MODE_LAYOUT, { x: -DESK_HALF_W - 0.045, zFront: DESK_HALF_D + 0.03, labels: { build: 'BUILD', game: 'TETRIS', sling: 'ANGRY SLING' } });
+  const modeBar = new Dock(MODE_LAYOUT, { x: -DESK_HALF_W - 0.045, zFront: DESK_HALF_D + 0.03, labels: { build: 'BUILD', game: 'TETRIS', sling: 'ANGRY SLING', arcade: 'ARCADE' } });
   modeBar.setSelected('build');
   deskRoot.add(modeBar.root);
   const modeBarPinch = new Map<number, boolean>();
@@ -374,7 +412,7 @@ function start(): void {
     if (next === mode) return;
     const prev = mode;
     mode = next;
-    modeBar.setSelected(next);
+    modeBar.setSelected(next === 'build' || next === 'game' || next === 'sling' ? next : 'arcade');
     if (prev === 'build') {
       interaction.cancelAll();
       onboarding.active = false;
@@ -383,18 +421,23 @@ function start(): void {
     }
     if (prev === 'game') tetris.exit();
     if (prev === 'sling') sling.exit();
+    arcadeGames.get(prev)?.exit();
+    const nextArcade = arcadeGame(next);
+    const fp = !!nextArcade?.firstPerson;
     const build = next === 'build';
     voxels.mesh.visible = build;
     dock.root.visible = build;
     desk.trash.visible = build;
-    // Tetris brings its own neon floor; sling keeps the table look.
-    desk.setDecorVisible(next !== 'game', next !== 'game' && !(session && xrMode === 'immersive-ar'));
+    // Tetris brings its own neon floor and first-person games their own world; the rest keep the table look.
+    desk.setDecorVisible(next !== 'game' && !fp, next !== 'game' && !fp && !(session && xrMode === 'immersive-ar'));
     sfx.play('chime');
     // Naga floats up out of the way of the game help cards.
     naga.home.set(-0.42, build ? 0.17 : 0.4, -0.17);
     if (!session) frameCamera(true);
+    if (fp) naga.home.set(-0.55, 0.5, -0.5);
     if (next === 'game') tetris.enter();
     else if (next === 'sling') sling.enter();
+    else if (nextArcade) nextArcade.enter();
     else if (!quiet) say('Back to building. Your desk is just as you left it.');
     showLegend(next);
   }
@@ -405,10 +448,11 @@ function start(): void {
     sfx.unlock();
     if (mode === 'game') tetris.action(id as never);
     else if (mode === 'sling') sling.action(id as never);
+    else currentArcade()?.action(id);
   });
   const seenHelp = new Set<string>();
   function showLegend(m: Mode): void {
-    const layout = session ? null : m === 'game' ? TETRIS_PAD : m === 'sling' ? SLING_PAD : null;
+    const layout = session ? null : m === 'game' ? TETRIS_PAD : m === 'sling' ? SLING_PAD : m === 'arcade' ? ARCADE_PAD : arcadeGame(m)?.pad ?? null;
     let first = false;
     if (layout) {
       try {
@@ -485,7 +529,8 @@ function start(): void {
     sfx.unlock();
     const passthrough = xrMode === 'immersive-ar';
     scene.background = passthrough ? null : bg;
-    desk.setDecorVisible(mode !== 'game', mode !== 'game' && !passthrough);
+    const fpNow = !!currentArcade()?.firstPerson;
+    desk.setDecorVisible(mode !== 'game' && !fpNow, mode !== 'game' && !fpNow && !passthrough);
     hands.showJoints = !passthrough;
     await renderer.xr.setSession(s);
     landing.classList.add('hidden');
@@ -517,6 +562,7 @@ function start(): void {
         speaker.stop();
         interaction.cancelAll();
         tetris.pausedByHost();
+        currentArcade()?.pausedByHost();
         sfx.suspend();
       }
     });
@@ -629,6 +675,7 @@ function start(): void {
   const setMouse = (ev: PointerEvent) => {
     ndc.set((ev.clientX / window.innerWidth) * 2 - 1, -(ev.clientY / window.innerHeight) * 2 + 1);
     ray.setFromCamera(ndc, camera);
+    lastMouseRay = ray.ray.clone();
     const up = new Vector3(0, 1, 0).applyQuaternion(deskRoot.quaternion);
     if (dragPlaneY === null) {
       const hit = ray.intersectObject(voxels.mesh, false)[0];
@@ -694,6 +741,10 @@ function start(): void {
       ev.preventDefault();
       return;
     }
+    if (currentArcade()?.key(k)) {
+      ev.preventDefault();
+      return;
+    }
     if (mode !== 'build' && k === 'm') { void onMic(); return; }
     if ((ev.ctrlKey || ev.metaKey) && ev.key === 'z') onDock(ev.shiftKey ? 'redo' : 'undo');
     else if (ev.key === ' ') { ev.preventDefault(); void onMic(); }
@@ -708,8 +759,16 @@ function start(): void {
       camera.fov = portrait ? 72 : 55;
       // Tetris is tall: look up the well. Sling and build look down at the table.
       const tall = mode === 'game';
-      camera.position.set(0, (portrait ? 1.7 : 1.36) + (tall ? 0.05 : 0), (portrait ? 0.78 : 0.5) + (tall ? 0.22 : 0));
-      orbit.target.set(0, tall ? 1.02 : 0.84, portrait ? -0.25 : -0.3);
+      if (currentArcade()?.firstPerson) {
+        // first person: the camera is the player's eyes, looking down the course
+        const eye = deskRoot.localToWorld(new Vector3(0, 0.45, 0.5));
+        camera.position.copy(eye);
+        orbit.target.copy(deskRoot.localToWorld(new Vector3(0, 0.38, -1.2)));
+        camera.fov = portrait ? 80 : 70;
+      } else {
+        camera.position.set(0, (portrait ? 1.7 : 1.36) + (tall ? 0.05 : 0), (portrait ? 0.78 : 0.5) + (tall ? 0.22 : 0));
+        orbit.target.set(0, tall ? 1.02 : 0.84, portrait ? -0.25 : -0.3);
+      }
       orbit.update();
     }
     // leave room for the on-screen control bar at the bottom (laptop / phone game modes)
@@ -745,6 +804,7 @@ function start(): void {
     }
     if (mode === 'game') tetris.update(hands.pointers, now, dt);
     else if (mode === 'sling') sling.update(hands.pointers, now, dt);
+    else if (mode !== 'build') currentArcade()?.update(hands.pointers, now, dt);
     else interaction.update(hands.pointers, now);
     updateModeBar(now);
     while (pending.length && !interaction.busy) apply(pending.shift()!);
@@ -775,14 +835,19 @@ function start(): void {
     enter,
     caps: () => agent.caps,
     /** test hooks: desk-cell centre -> world, and live pointer state */
+    /** desk-local metres -> world */
+    localToWorld: (x: number, y: number, z: number) => deskRoot.localToWorld(new Vector3(x, y, z)).toArray(),
+    worldToLocal: (x: number, y: number, z: number) => deskRoot.worldToLocal(new Vector3(x, y, z)).toArray(),
     deskToWorld: (x: number, y: number, z: number) => deskRoot.localToWorld(new Vector3((x + 0.5) * CELL, (y + 0.5) * CELL, (z + 0.5) * CELL)).toArray(),
     pointers: () => hands.pointers.map((p) => ({ id: p.id, kind: p.kind, active: p.active, pinching: p.pinching, pinch: p.pinchPoint.toArray(), tip: p.indexTip?.toArray() ?? null })),
     caption: () => naga.caption,
     interaction,
     tetris,
     sling,
-    setMode: (m: 'build' | 'game' | 'sling') => setMode(m),
+    setMode: (m: Mode) => setMode(m),
     mode: () => mode,
+    /** the open arcade game (or picker), for tests */
+    arcade: () => currentArcade() as unknown as Record<string, (...a: unknown[]) => unknown> | null,
   };
   (window as unknown as { __naga: typeof api }).__naga = api;
   if (DEBUG) mountDebugPanel(api);

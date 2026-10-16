@@ -82,8 +82,21 @@ describe('intent parser', () => {
     ['drop', { type: 'game', action: 'drop' }],
     ['pause', { type: 'game', action: 'pause' }],
     ['play angry sling', { type: 'game', action: 'start', game: 'sling' }],
+    ['play galago', { type: 'game', action: 'start', game: 'galago' }],
+    ["let's play marble maze", { type: 'game', action: 'start', game: 'maze' }],
+    ['whack a gloom', { type: 'game', action: 'start', game: 'whack' }],
+    ['play breakout', { type: 'game', action: 'start', game: 'breakout' }],
+    ['play jenga', { type: 'game', action: 'start', game: 'tower' }],
+    ['play fappy bro', { type: 'game', action: 'start', game: 'fappy' }],
+    ['play flappy bird', { type: 'game', action: 'start', game: 'fappy' }],
+    ['mike penguin', { type: 'game', action: 'start', game: 'penguin' }],
+    ['open the arcade', { type: 'game', action: 'start', game: 'arcade' }],
     ['next level', { type: 'game', action: 'next' }],
   ];
+  it('"build a penguin" is a build request for the agent, not the penguin game', () => {
+    expect(parseIntent('build a penguin')?.build?.type).not.toBe('game');
+    expect(parseIntent('build a tower')?.build?.type).toBe('build');
+  });
   for (const [text, want] of cases) {
     it(text, () => {
       const env = parseIntent(text);

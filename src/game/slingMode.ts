@@ -30,6 +30,7 @@ import {
   type Object3D,
 } from 'three';
 import { sfx } from '../audio/sfx.js';
+import { SynthMusic } from '../audio/music.js';
 import { bevelTexture } from '../blocks/voxelRenderer.js';
 import { Dock, SLING_LAYOUT, type DockAction } from '../ui/dock.js';
 import { Sparkles } from '../fx/sparkles.js';
@@ -87,6 +88,7 @@ export class SlingMode {
   state: State = 'aiming';
   score = 0;
   private stateT = 0;
+  private music = new SynthMusic('sling');
   private damageOn = false;
   private elapsed = 0;
   private acc = 0;
@@ -243,6 +245,7 @@ export class SlingMode {
   exit(): void {
     this.root.visible = false;
     this.pull = null;
+    this.music.stop();
     this.clearWorld();
   }
 
@@ -326,7 +329,7 @@ export class SlingMode {
     const m = other.mass > 0 ? Math.min(other.mass, 14) : 6;
     const dmg = (v - 0.9) * m * 0.9;
     obj.hp -= dmg;
-    if (v > 2.2) sfx.play('lock');
+    if (v > 2.2) sfx.play(obj && 'mat' in obj && obj.mat === 'stone' ? 'thud' : obj && 'mat' in obj && obj.mat === 'wood' ? 'creak' : 'lock', 0.8 + Math.random() * 0.4);
     if (obj.hp <= 0) this.destroy(obj);
   }
 
@@ -341,11 +344,14 @@ export class SlingMode {
     if ('mat' in obj) {
       this.score += MAT[obj.mat].points;
       this.sparkles.burst(at, MAT[obj.mat].color, obj.mat === 'glass' ? 22 : 14, 2.5);
-      sfx.play(obj.mat === 'glass' ? 'clear' : 'delete', obj.mat === 'stone' ? 0.7 : 1);
+      sfx.play(obj.mat === 'glass' ? 'clear' : obj.mat === 'wood' ? 'brick' : 'explode', obj.mat === 'stone' ? 0.7 : 1);
+      if (obj.mat !== 'glass') sfx.play('thud');
     } else {
       this.score += 5000;
       this.sparkles.burst(at, 0xb48cff, 40, 3.5);
       this.sparkles.ring(at, 0xd9c2ff, 1.4);
+      sfx.play('pop');
+      sfx.play('squeak');
       sfx.play('bigclear');
       this.host.celebrate();
       if (this.targets.every((t) => !t.alive)) this.win();
@@ -379,6 +385,7 @@ export class SlingMode {
   // ----------------------------------------------------------------- per frame
 
   update(pointers: Pointer[], now: number, dt: number): void {
+    if (!this.music.playing) this.music.start(sfx.ctx, 1 + Math.floor(this.levelIndex / 3));
     if (!this.root.visible) return;
     // arena orientation / zoom (smooth)
     this.arena.rotation.y += (this.yaw - this.arena.rotation.y) * Math.min(1, dt * 8);
@@ -513,7 +520,8 @@ export class SlingMode {
     this.state = 'flying';
     this.stateT = 0;
     this.damageOn = true;
-    sfx.play('cast');
+    sfx.play('boing');
+    sfx.play('whoosh');
   }
 
   // ----------------------------------------------------------------- rendering

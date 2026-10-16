@@ -5,7 +5,7 @@
  * unavailable or returns junk, and (2) by the client when the agent endpoint
  * is unreachable, so typed/recognised commands still work offline.
  */
-import type { AgentEnvelope, Anchor, BlueprintId, BuildCommand, PaletteName } from './protocol.js';
+import type { AgentEnvelope, Anchor, BlueprintId, BuildCommand, GameMode, PaletteName } from './protocol.js';
 
 const BLUEPRINT_WORDS: Array<[RegExp, BlueprintId, string]> = [
   // specific things first, so "lighthouse" is not a house and "castle" is not a tower
@@ -155,6 +155,21 @@ export function parseIntent(raw: string): AgentEnvelope | null {
   // --- tetris mode -------------------------------------------------------
   if (/\b(stop|exit|quit|end|leave|close) (the )?(game|tetris)\b/.test(t) || /\b(build(ing)? mode|back to build(ing)?)\b/.test(t)) {
     return envelope('Back to building.', { v: 1, type: 'game', action: 'stop' });
+  }
+  // arcade games (checked before Tetris so "play galago" is not read as "play a game")
+  const arcade: Array<[RegExp, string, string]> = [
+    [/\b(galago|galaga|space ?shooter|shoot(ing)? (the )?aliens?|space invaders?|alien game)\b/, 'galago', 'Galago! Blast the swarm.'],
+    [/\b(marble( maze)?|tilt( maze| game)?|labyrinth game|ball maze)\b/, 'maze', 'Marble Maze — tilt to roll.'],
+    [/\b(whack|bop|mole)/, 'whack', 'Whack-a-Gloom! Bop them.'],
+    [/\b(breakout|brick ?breaker|bricks game|arkanoid|paddle game)\b/, 'breakout', 'Breakout 3D!'],
+    [/\b(block tower|jenga|tower game|stacking game|pull (a |the )?blocks?)\b/, 'tower', 'Block Tower — pull slowly.'],
+    [/\b(fappy|flappy|flap(py)? bro|flapping game|bird game)\b/, 'fappy', 'Fappy Bro! Flap through the gaps.'],
+    [/\b(mike penguin|penguin( game| run| adventure)?|ice run)\b/, 'penguin', 'Mike Penguin! Run for the flag.'],
+    [/\b(arcade|more games|other games|mini ?games?|game menu|pick a game)\b/, 'arcade', 'Arcade! Pick a game.'],
+  ];
+  const wantsBuild = /\b(build|make|create|place|put|add|spawn|draw|construct|sculpt)\b/.test(t);
+  if (!wantsBuild && (/\b(play|start|open|launch|lets|game|go to|switch to)\b/.test(t) || t.trim().split(' ').length <= 3)) {
+    for (const [re, game, line] of arcade) if (re.test(t)) return envelope(line, { v: 1, type: 'game', action: 'start', game: game as GameMode });
   }
   if (/\b(angry birds?|angry sling|sling ?shot|sling mode|play sling|catapult|birds? game|launch(ing)? game|knock (them|it) down)\b/.test(t)) {
     return envelope('Angry Sling — pull back and let fly!', { v: 1, type: 'game', action: 'start', game: 'sling' });

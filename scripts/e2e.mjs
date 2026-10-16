@@ -262,6 +262,107 @@ check('pebble flies away from the player', !!sl.bird && sl.bird[2] < 1.6, JSON.s
 await shot('12-sling-flight');
 await page.evaluate(() => window.__naga.setMode('build'));
 
+// --- 12. Arcade: pick a game with a pinch, then one real interaction per game -------------
+const arc = (fn, ...a) => page.evaluate(({ fn, a }) => window.__naga.arcade()[fn](...a), { fn, a });
+const gst = () => arc('debugState');
+const pinchAt = async (target) => { await pinch(0); await wait(150); await aim(target); await pinch(1); await wait(250); };
+const moveBy = async (from, d, steps = 5) => { for (let i = 1; i <= steps; i++) await handTo([from[0] + d[0] * i / steps, from[1] + d[1] * i / steps, from[2] + d[2] * i / steps]); };
+const deskVec = async (dx, dy, dz) => page.evaluate(([dx, dy, dz]) => { const a = window.__naga.localToWorld(0, 0, 0), b = window.__naga.localToWorld(dx, dy, dz); return [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; }, [dx, dy, dz]);
+const local = (x, y, z) => page.evaluate(([x, y, z]) => window.__naga.localToWorld(x, y, z), [x, y, z]);
+const handLocal = async () => page.evaluate((p) => window.__naga.worldToLocal(...p), await stablePinch());
+await page.evaluate(() => window.__naga.setMode('arcade'));
+await wait(600);
+await pinchAt(await arc('debugTileWorld', 'galago'));
+await pinch(0); await wait(400);
+check('arcade: pinching the GALAGO tile opens Galago', (await page.evaluate(() => window.__naga.mode())) === 'galago');
+await wait(2500); // let the swarm fly in
+{
+  await pinch(1); await wait(300);
+  const here = await stablePinch();
+  const x0 = (await gst()).ship[0];
+  await moveBy(here, await deskVec(0.05, 0, 0));
+  await wait(3500);
+  const g = await gst();
+  await pinch(0);
+  check('galago: pinch-move steers the ship and holding fires', g.ship[0] > x0 + 0.02 && (g.score > 0 || g.aliens < 20), JSON.stringify(g));
+}
+await page.evaluate(() => window.__naga.setMode('whack'));
+await wait(500);
+await arc('debugForceUp', 4);
+await pinchAt(await arc('debugHoleWorld', 4));
+await pinch(0);
+check('whack: pinching a gloomling bops it', (await gst()).score === 1, JSON.stringify(await gst()));
+await page.evaluate(() => window.__naga.setMode('maze'));
+await wait(500);
+{
+  const m0 = await gst();
+  const here = await stablePinch();
+  await pinch(1); await wait(200);
+  await moveBy(here, await deskVec(0.06, 0, 0));
+  await wait(1500);
+  const m1 = await gst();
+  await pinch(0);
+  check('maze: pinch-push tilts the board and the marble rolls', m1.tilt[1] < -0.05 && Math.abs(m1.pos[0] - m0.pos[0]) + Math.abs(m1.pos[2] - m0.pos[2]) > 0.005, JSON.stringify([m0.pos, m1.pos, m1.tilt]));
+  await arc('debugTeleportToGoal');
+  await wait(3800);
+  check('maze: reaching the goal moves on to the next maze', (await gst()).level === m0.level + 1, JSON.stringify(await gst()));
+}
+await page.evaluate(() => window.__naga.setMode('breakout'));
+await wait(500);
+{
+  await aim(await local(0, 0.18, 0.12)); await wait(400);
+  const here = await stablePinch();
+  const p0 = (await gst()).paddle;
+  await moveBy(here, await deskVec(0.07, 0.05, 0));
+  await wait(500);
+  const p1 = (await gst()).paddle;
+  await pinch(1); await wait(300); await pinch(0);
+  const b = await gst();
+  check('breakout: the paddle follows the hand and a pinch launches', Math.abs(p1[0] - p0[0]) + Math.abs(p1[1] - p0[1]) > 0.03 && !b.stuck, JSON.stringify([p0, p1, b.stuck]));
+}
+await page.evaluate(() => window.__naga.setMode('tower'));
+await wait(800);
+{
+  // a loose block in an x-running layer: pinch its right end and pull it out sideways
+  const pick = await page.evaluate(() => { const t = window.__naga.arcade(); const b = t.blocks.find((x) => x.thin && x.layer % 2 === 0 && x.layer > 1); return [b.layer, b.slot]; });
+  const tgt = await arc('debugBlockEndWorld', ...pick);
+  await pinch(0); await wait(150); await aim(tgt); await pinch(1);
+  const polls = [];
+  for (let i = 0; i < 6; i++) { await wait(50); polls.push((await gst()).grabbed); }
+  const grabbed = polls.some(Boolean);
+  const here = await stablePinch();
+  await moveBy(here, await deskVec(0.11, 0, 0), 8);
+  await wait(300);
+  await pinch(0); await wait(1500);
+  const t = await gst();
+  check('tower: pinch-pull a loose block out and it goes on top, tower stands', grabbed && t.score === 1 && t.state === 'play', JSON.stringify({ grabbed, ...t, ev: await page.evaluate(() => window.__naga.arcade().events.slice(-6)) }));
+}
+await page.evaluate(() => window.__naga.setMode('fappy'));
+await wait(600);
+await pinch(1); await wait(150); await pinch(0); await wait(250);
+{
+  const f = await gst();
+  check('fappy bro: a pinch flaps and starts the flight', f.state === 'play' && f.alt > 0.02, JSON.stringify(f));
+}
+await page.evaluate(() => window.__naga.setMode('penguin'));
+await wait(600);
+await pinch(1); await wait(120); await pinch(0); await wait(600);
+{
+  await pinch(1); await wait(300);
+  const here = await stablePinch();
+  await moveBy(here, await deskVec(0.09, 0, 0));
+  await pinch(0); await wait(300);
+  const pg = await gst();
+  console.log('    hand', JSON.stringify(await handLocal()));
+  check('mike penguin: tap starts the run, pinch-swipe right changes lane', pg.state === 'play' && pg.lane === 1 && pg.speed > 1, JSON.stringify({ ...pg, ev: await page.evaluate(() => window.__naga.arcade().events.slice(-6)) }));
+}
+await shot('13-penguin');
+const calls = await page.evaluate(() => window.__naga.stats().calls);
+check('first-person game draw calls within budget (≤60)', calls <= 60, String(calls));
+await page.evaluate(() => window.__naga.say('back to building'));
+await wait(600);
+check('voice leaves the arcade', (await page.evaluate(() => window.__naga.mode())) === 'build');
+
 check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 await browser.close();
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASSED');

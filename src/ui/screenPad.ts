@@ -156,9 +156,14 @@ export class ScreenPad {
       }
     });
     const stop = () => {
+      const held = this.timers.has(b.id) || b.repeat;
       clearTimeout(this.timers.get(b.id));
       this.timers.delete(b.id);
+      // games that steer while a button is held get a release event ("left:up")
+      if (held && b.repeat && btn.dataset.down === '1') this.onAction(`${b.id}:up`);
+      btn.dataset.down = '0';
     };
+    btn.addEventListener('pointerdown', () => (btn.dataset.down = '1'));
     btn.addEventListener('pointerup', stop);
     btn.addEventListener('pointerleave', stop);
     btn.addEventListener('pointercancel', stop);
@@ -306,5 +311,61 @@ export const TOWER_PAD: PadLayout = {
     { head: 'Mouse or touch', lines: ['Click a block to push it out a little; drag to pull it', 'Then press To top'] },
     { head: 'Quest — hands', lines: ['Pinch a block and slowly pull it out', 'Let go above the tower to stack it (or poke TO TOP)'] },
     { head: 'Quest — controllers', lines: ['Touch a block, hold the trigger, and pull'] },
+  ],
+};
+
+export const ARCADE_PAD: PadLayout = {
+  title: 'Arcade',
+  hint: 'Pick a game. Each one works with hands, controllers, mouse, touch and keyboard.',
+  rows: [
+    [
+      { id: 'galago', label: 'Galago', key: '1', tip: 'Space shooter (1)' },
+      { id: 'maze', label: 'Marble Maze', key: '2', tip: 'Tilt the board (2)' },
+      { id: 'whack', label: 'Whack-a-Gloom', key: '3', tip: 'Bop the gloomlings (3)' },
+      { id: 'breakout', label: 'Breakout 3D', key: '4', tip: '3D brick breaker (4)' },
+    ],
+    [
+      { id: 'tower', label: 'Block Tower', key: '5', tip: 'Pull blocks, stack on top (5)' },
+      { id: 'fappy', label: 'Fappy Bro', key: '6', tip: 'First-person flapper (6)' },
+      { id: 'penguin', label: 'Mike Penguin', key: '7', tip: 'First-person ice run (7)' },
+    ],
+  ],
+  extras: [HELP, BACK],
+  help: [
+    { head: 'Pick a game', lines: ['Click a button, press 1–7, or say “play galago”, “marble maze”, “mike penguin”…', 'Esc (or Back to build) returns to your desk, untouched'] },
+    { head: 'Quest', lines: ['Poke or pinch a tile on the desk', 'The column on the left edge of the desk switches modes any time'] },
+  ],
+};
+
+export const FAPPY_PAD: PadLayout = {
+  title: 'Fappy Bro',
+  hint: 'You are the bird. Flap to rise, fall between flaps, and fly through the gaps.',
+  rows: [[{ id: 'flap', label: 'Flap', key: 'Space', tip: 'Flap (Space, click, tap)', wide: true }]],
+  extras: [NEW, PAUSE, HELP, BACK],
+  help: [
+    { head: 'Keyboard', lines: ['Space, ↑ or W flaps', 'N new game · P pause · Esc back'] },
+    { head: 'Mouse or touch', lines: ['Click or tap anywhere on the game to flap'] },
+    { head: 'Quest — hands', lines: ['Pinch to flap (either hand)', 'Or flap a hand down quickly', 'Sit still: the world moves, you do not'] },
+    { head: 'Quest — controllers', lines: ['Trigger or A/X flaps'] },
+  ],
+};
+
+export const PENGUIN_PAD: PadLayout = {
+  title: 'Mike Penguin',
+  hint: 'Run the ice road: dodge seals and cracks, jump the holes, grab fish, beat the clock to each flag.',
+  rows: [
+    [
+      { id: 'left', label: 'Left', key: '←', tip: 'Step left (← or A)' },
+      { id: 'jump', label: 'Jump', key: 'Space', tip: 'Jump (Space or ↑)', wide: true },
+      { id: 'right', label: 'Right', key: '→', tip: 'Step right (→ or D)' },
+      { id: 'down', label: 'Slow', key: '↓', tip: 'Hold to slow down (↓ or S)', repeat: true },
+    ],
+  ],
+  extras: [NEW, PAUSE, HELP, BACK],
+  help: [
+    { head: 'Keyboard', lines: ['← → change lane · Space or ↑ jump · hold ↓ slow down', 'N new game · P pause · Esc back'] },
+    { head: 'Mouse or touch', lines: ['Tap the left / right side to change lane, swipe up or tap the middle to jump'] },
+    { head: 'Quest — hands', lines: ['Pinch and swipe left / right to change lane', 'Quick pinch (or lift your hand) to jump'] },
+    { head: 'Quest — controllers', lines: ['Thumbstick left / right changes lane', 'Trigger or A/X jumps · pull stick back to slow'] },
   ],
 };

@@ -70,6 +70,22 @@ pull back the slingshot, let a glowing pebble fly, and knock down glass, wood an
 The physics (cannon-es) is simulated at full scale (1 m blocks) and rendered at 1:10, so towers fall with real weight.
 Glass shatters easily, wood takes a few hits, stone is tough. Every level is unit-tested to stand still until hit and not collapse on its own.
 
+## Arcade (7 more games)
+
+Tap **ARCADE** on the mode bar (or say **“open the arcade”**, **“play galago”**, **“mike penguin”**…) and seven tiles appear on the desk. Poke or pinch one, press 1–7, or click the buttons. Every game works with hands, Quest controllers, mouse, touch and keyboard. Each one has its own synthesised theme tune and sound effects, its best score is saved on the device, and a How to play card is on the desk and on screen.
+
+| Game | What you do | Hands | Keyboard |
+|---|---|---|---|
+| **Galago** | Space shooter: an alien swarm hovers at the back of the desk and dives at you in 3D curves | pinch + move to fly, hold to fire | arrows + Space |
+| **Marble Maze** | Tilt a wooden board to roll a steel marble to the goal. A fresh maze each level, holes from level 4, auto-advance | pinch and push the way it should roll | hold arrows |
+| **Whack-a-Gloom** | 60-second rounds: bop gloomlings (gold = 3 points, pebbles = −1), combos | poke with a finger or pinch | Q W E / A S D / Z X C |
+| **Breakout 3D** | A glass box with a brick wall at the back. Your glass paddle follows your hand; a marker shows where the ball arrives | raise your hand, pinch to launch | arrows + Space |
+| **Block Tower** | Real-physics stacking tower: pull a loose block out slowly, it goes on top. One collapse ends the game | pinch a block and pull | arrows pick, Space pushes, T to top |
+| **Fappy Bro** | *First person:* you are the bird. Flap through the gaps in the walls | pinch, or flap your arm down | Space |
+| **Mike Penguin** | *First person:* race down a 3-lane ice road; jump holes and cracks, dodge seals, grab fish, reach each flag before the clock runs out | pinch-swipe to change lane, quick pinch to jump | ← → Space, hold ↓ to slow |
+
+First-person comfort: you never move. The world moves past you, and the desk and dock stay fixed in front of you.
+
 ## Voice commands
 
 Naga understands open phrasing through an LLM, with a fast deterministic parser for clear commands:

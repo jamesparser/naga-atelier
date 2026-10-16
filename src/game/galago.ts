@@ -56,8 +56,8 @@ export class Galago extends GameBase {
   private shots: Shot[] = [];
   private bombs: Shot[] = [];
   private ship = new Group();
-  private shipPos = new Vector3(0, 0.16, PLAYER_Z);
-  private target = new Vector3(0, 0.16, PLAYER_Z);
+  private shipPos = new Vector3(0, 0.2, PLAYER_Z);
+  private target = new Vector3(0, 0.2, PLAYER_Z);
   private meshes: InstancedMesh[];
   private shotMesh: InstancedMesh;
   private bombMesh: InstancedMesh;
@@ -79,7 +79,7 @@ export class Galago extends GameBase {
   private tmpQ = new Quaternion();
 
   constructor(deskRoot: Object3D, host: GameHost) {
-    super(deskRoot, host, GALAGO_LAYOUT, GALAGO_PAD, 'naga-atelier:galago-best:v1');
+    super(deskRoot, host, GALAGO_LAYOUT, GALAGO_PAD, 'naga-atelier:galago-best:v1', 'galago');
     const geos = [new OctahedronGeometry(0.016, 0), new TetrahedronGeometry(0.02, 0), new DodecahedronGeometry(0.019, 0)];
     this.meshes = geos.map((g, i) => {
       const m = new InstancedMesh(g, new MeshStandardMaterial({ color: KIND_COLOR[i], emissive: KIND_COLOR[i], emissiveIntensity: 0.55, roughness: 0.4, flatShading: true }), 40);
@@ -112,6 +112,13 @@ export class Galago extends GameBase {
     this.stars = new Points(sg, new PointsMaterial({ size: 0.006, map: dotTexture(), color: 0xbfe8ff, transparent: true, blending: AdditiveBlending, depthWrite: false }));
     this.stars.frustumCulled = false;
     this.root.add(this.stars);
+  }
+
+  protected override musicOn(): boolean {
+    return this.state === 'play' || this.state === 'warp';
+  }
+  protected override musicTempo(): number {
+    return this.wave;
   }
 
   private resetStar(i: number, anywhere = false): void {
@@ -186,8 +193,18 @@ export class Galago extends GameBase {
   private fire(): void {
     if (this.state !== 'play' || this.fireCd > 0 || this.shots.length >= 5) return;
     this.fireCd = 0.2;
-    this.shots.push({ pos: this.shipPos.clone().add(new Vector3(0, 0, -0.03)), vel: new Vector3(0, 0, -0.9) });
-    sfx.play('tick');
+    const from = this.shipPos.clone().add(new Vector3(0, 0, -0.03));
+    const vel = new Vector3(0, 0, -0.9);
+    // aim assist (height only): lines up with the nearest alien in your column, so steering
+    // left/right is enough on a keyboard, and hands don't need perfect height
+    let best: Alien | null = null;
+    for (const a of this.aliens) {
+      if (!a.alive || a.pos.z > from.z - 0.02 || Math.abs(a.pos.x - from.x) > 0.03) continue;
+      if (!best || a.pos.z > best.pos.z) best = a;
+    }
+    if (best) vel.y = ((best.pos.y - from.y) / (from.z - best.pos.z)) * 0.9;
+    this.shots.push({ pos: from, vel });
+    sfx.play('laser', 0.9 + Math.random() * 0.2);
   }
 
   protected tick(frames: PointerFrame[], now: number, dt: number): void {
@@ -207,7 +224,10 @@ export class Galago extends GameBase {
       if (f.down && !this.grab) this.grab = { id: p.id, start: f.local.clone(), ship: this.target.clone() };
       if (this.grab?.id === p.id) {
         if (f.up || !p.pinching) this.grab = null;
-        else {
+        else if (f.settling) {
+          this.grab.start.copy(f.local);
+          this.firing = true;
+        } else {
           if (p.kind !== 'hand' || p.strength > 0.75) {
             const d = f.local.clone().sub(this.grab.start);
             // mouse/touch move on the desk plane: use depth as height
@@ -273,7 +293,7 @@ export class Galago extends GameBase {
             p3: aim.clone().add(new Vector3(-side * 0.18, -0.05, 0.4)),
             shot: false,
           };
-          sfx.play('listen');
+          sfx.play('swoop');
         }
       }
       // shots vs aliens
@@ -288,10 +308,10 @@ export class Galago extends GameBase {
             const pts = KIND_POINTS[a.kind] * (a.dive ? 2 : 1);
             this.score += pts;
             this.sparkles.burst(a.pos, KIND_COLOR[a.kind], 18, 0.35);
-            sfx.play(a.kind === 2 ? 'bigclear' : 'clear');
+            sfx.play(a.kind === 2 ? 'bigclear' : 'explode');
           } else {
             this.sparkles.burst(a.pos, 0xffffff, 6, 0.2);
-            sfx.play('lock');
+            sfx.play('brick', 1.4);
           }
           break;
         }
@@ -313,6 +333,7 @@ export class Galago extends GameBase {
         this.state = 'warp';
         this.stateT = 0;
         sfx.play('levelup');
+        sfx.play('warp');
         this.host.celebrate();
         this.host.say(`Wave ${this.wave} cleared! Warping…`);
       }
@@ -328,7 +349,8 @@ export class Galago extends GameBase {
     this.lives--;
     this.invuln = 2;
     this.sparkles.burst(this.shipPos, 0xffb347, 40, 0.5);
-    sfx.play('delete');
+    sfx.play('explode');
+    sfx.play('hurt');
     if (this.lives <= 0) {
       this.state = 'over';
       sfx.play('gameover');

@@ -71,7 +71,7 @@ export const COMMAND_TYPES = [
   'game',
 ] as const;
 export const GAME_ACTIONS = ['start', 'stop', 'pause', 'drop', 'retry', 'next'] as const;
-export const GAME_MODES = ['tetris', 'sling'] as const;
+export const GAME_MODES = ['tetris', 'sling', 'arcade', 'galago', 'maze', 'whack', 'breakout', 'tower', 'fappy', 'penguin'] as const;
 export type GameMode = (typeof GAME_MODES)[number];
 export type GameAction = (typeof GAME_ACTIONS)[number];
 export type CommandType = (typeof COMMAND_TYPES)[number];
