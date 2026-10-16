@@ -37,31 +37,49 @@ function withTimeout(ms: number): AbortSignal {
 /** Extract the first JSON object from an LLM reply (tolerates think tags / fences). */
 export function extractJson(text: string): unknown {
   const cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```(?:json)?/g, '');
-  const start = cleaned.indexOf('{');
-  if (start < 0) return null;
-  let depth = 0, inStr = false, esc = false;
-  for (let i = start; i < cleaned.length; i++) {
-    const ch = cleaned[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (ch === '\\') esc = true;
-      else if (ch === '"') inStr = false;
-      continue;
-    }
-    if (ch === '"') inStr = true;
-    else if (ch === '{') depth++;
-    else if (ch === '}' && --depth === 0) {
-      try {
-        return JSON.parse(cleaned.slice(start, i + 1));
-      } catch {
-        return null;
+  const starts: number[] = [];
+  for (let i = 0; i < cleaned.length; i++) if (cleaned[i] === '{') starts.push(i);
+  let best: unknown = null;
+  let bestScore = -1;
+  for (const start of starts) {
+    let depth = 0, inStr = false, esc = false;
+    for (let i = start; i < cleaned.length; i++) {
+      const ch = cleaned[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === '\\') esc = true;
+        else if (ch === '"') inStr = false;
+        continue;
+      }
+      if (ch === '"') inStr = true;
+      else if (ch === '{') depth++;
+      else if (ch === '}' && --depth === 0) {
+        const slice = cleaned.slice(start, i + 1);
+        let obj: unknown = null;
+        try {
+          obj = JSON.parse(slice);
+        } catch {
+          try {
+            obj = JSON.parse(slice.replace(/,\s*([}\]])/g, '$1').replace(/'/g, '"'));
+          } catch {
+            break;
+          }
+        }
+        // Prefer a full envelope over a nested build command.
+        const o = obj as Record<string, unknown> | null;
+        const score = o && typeof o === 'object' ? (typeof o.speech === 'string' ? 2 : 0) + ('build' in o ? 1 : 0) : 0;
+        if (score > bestScore) {
+          bestScore = score;
+          best = obj;
+        }
+        break;
       }
     }
   }
-  return null;
+  return best;
 }
 
-export async function askLLM(env: AgentEnv, text: string, timeoutMs = 6000): Promise<AgentEnvelope | null> {
+export async function askLLM(env: AgentEnv, text: string, timeoutMs = 12000): Promise<AgentEnvelope | null> {
   if (!env.LLM_API_KEY) return null;
   const base = (env.LLM_BASE_URL || 'https://api.tokenfactory.nebius.com/v1').replace(/\/$/, '');
   const res = await fetch(`${base}/chat/completions`, {
@@ -70,7 +88,8 @@ export async function askLLM(env: AgentEnv, text: string, timeoutMs = 6000): Pro
     body: JSON.stringify({
       model: env.LLM_MODEL || 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B',
       temperature: 0.2,
-      max_tokens: 400,
+      // Nemotron reasoning consumes completion budget before content; 400 leaves content empty.
+      max_tokens: 900,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: text },
@@ -79,11 +98,18 @@ export async function askLLM(env: AgentEnv, text: string, timeoutMs = 6000): Pro
     signal: withTimeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`llm ${res.status}`);
-  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = data.choices?.[0]?.message?.content ?? '';
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string; reasoning?: string } }> };
+  const msg = data.choices?.[0]?.message;
+  // Prefer content; if reasoning model spent the budget there, salvage the tail JSON.
+  const content = (msg?.content ?? msg?.reasoning ?? '').trim();
   const env2 = sanitizeEnvelope(extractJson(content));
-  if (env2) env2.source = 'llm';
-  return env2;
+  if (env2) {
+    env2.source = 'llm';
+    return env2;
+  }
+  // Model replied in prose without a usable envelope — still give the user a voice line.
+  const speech = content.replace(/^[^"'\w]*/, '').replace(/\s+/g, ' ').slice(0, 160) || "I'm not sure how to build that yet.";
+  return { speech, build: null, source: 'llm_speech' };
 }
 
 /** Decide what to do with one utterance. Never throws. */
@@ -101,10 +127,12 @@ export async function decide(env: AgentEnv, text: string): Promise<AgentEnvelope
       if (!llm.build && rules?.build) return done({ ...rules, speech: llm.speech || rules.speech });
       return done(llm);
     }
-  } catch {
-    /* fall through to rules */
+  } catch (e) {
+    // Surface a short reason so ops can see why we fell back (never throw).
+    const reason = String((e as Error)?.message || e).slice(0, 80);
+    return done({ ...(rules ?? fallbackEnvelope(text)), source: `fallback(${reason})` });
   }
-  return done(rules ?? fallbackEnvelope(text));
+  return done({ ...(rules ?? fallbackEnvelope(text)), source: rules ? 'rules' : 'fallback(llm_empty)' });
 }
 
 /** AssemblyAI batch transcription of a short clip. */

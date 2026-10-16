@@ -18,7 +18,7 @@ done
 # Patterns live in private/scrub-patterns.txt (one ERE per line) so the list itself stays private.
 PATTERNS="$SRC/private/scrub-patterns.txt"
 [ -f "$PATTERNS" ] || { echo "missing $PATTERNS" >&2; exit 1; }
-if grep -rIniE -f "$PATTERNS" "$DEST" --exclude-dir=node_modules --exclude=package-lock.json; then
+if grep -rIniE -f "$PATTERNS" "$DEST" --exclude-dir=node_modules --exclude-dir=.git --exclude=package-lock.json; then
   echo "SCRUB FAILED: sensitive pattern found in public export" >&2
   exit 1
 fi

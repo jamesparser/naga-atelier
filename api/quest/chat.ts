@@ -46,7 +46,19 @@ export function OPTIONS(req: Request): Response {
 }
 
 export function GET(req: Request): Response {
-  return json({ ok: true, v: 1, stt: !!env.ASSEMBLYAI_API_KEY, llm: !!env.LLM_API_KEY, tts: !!env.TTS_BASE_URL }, 200, req);
+  return json(
+    {
+      ok: true,
+      v: 1,
+      stt: !!env.ASSEMBLYAI_API_KEY,
+      llm: !!env.LLM_API_KEY,
+      tts: !!env.TTS_BASE_URL,
+      llmModel: env.LLM_MODEL || null,
+      llmBase: env.LLM_BASE_URL || 'https://api.tokenfactory.nebius.com/v1',
+    },
+    200,
+    req,
+  );
 }
 
 export async function POST(req: Request): Promise<Response> {
