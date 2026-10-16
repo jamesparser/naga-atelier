@@ -26,6 +26,9 @@ export function executeCommand(model: VoxelModel, cmd: BuildCommand): ExecResult
       model.commit(`build ${bp.id}`, plan.changes, plan.spawnId);
       return { ok: true, spawn: plan, keys: plan.order };
     }
+    case 'export':
+      // Client-side side effect (download). Nothing to mutate in the model.
+      return { ok: true };
     case 'clear': {
       if (model.size === 0) return { ok: true, speech: 'The desk is already clear.' };
       model.commit('clear', model.diff([...model.cells.keys()].map((k) => [k, null])), null);

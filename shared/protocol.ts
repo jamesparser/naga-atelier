@@ -46,6 +46,7 @@ export const COMMAND_TYPES = [
   'redo',
   'scale',
   'rotate',
+  'export',
 ] as const;
 export type CommandType = (typeof COMMAND_TYPES)[number];
 

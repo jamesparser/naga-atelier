@@ -19,7 +19,7 @@ import type { PaletteName } from '../../shared/protocol.js';
 import { PALETTE, SWATCHES } from '../blocks/palette.js';
 import { DESK_HALF_D } from '../scene/desk.js';
 
-export type DockAction = 'mic' | 'undo' | 'redo' | 'magic' | 'recenter' | `swatch:${PaletteName}`;
+export type DockAction = 'mic' | 'undo' | 'redo' | 'magic' | 'export' | 'recenter' | `swatch:${PaletteName}`;
 
 interface Button {
   id: DockAction;
@@ -51,6 +51,7 @@ export class Dock {
       ['redo', big],
       ...SWATCHES.map((s) => [`swatch:${s}`, small] as [DockAction, number]),
       ['magic', big],
+      ['export', 0.018],
       ['recenter', big],
     ];
     const gap = 0.012;
@@ -221,6 +222,12 @@ function iconTexture(id: DockAction): CanvasTexture {
       g.closePath(); g.fill();
       break;
     }
+    case 'export':
+      // Down-arrow into a tray = save/download
+      g.beginPath(); g.moveTo(64, 18); g.lineTo(64, 78); g.stroke();
+      g.beginPath(); g.moveTo(42, 58); g.lineTo(64, 80); g.lineTo(86, 58); g.stroke();
+      g.beginPath(); g.roundRect(28, 92, 72, 22, 6); g.stroke();
+      break;
     case 'recenter':
       g.beginPath(); g.arc(64, 64, 30, 0, Math.PI * 2); g.stroke();
       g.beginPath(); g.moveTo(64, 14); g.lineTo(64, 40); g.moveTo(64, 88); g.lineTo(64, 114);

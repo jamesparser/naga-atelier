@@ -111,6 +111,15 @@ export function parseIntent(raw: string): AgentEnvelope | null {
   ) {
     return envelope(pick(['Clearing the desk.', 'Fresh desk.'], t), { v: 1, type: 'clear' });
   }
+  // --- export ----------------------------------------------------------
+  if (
+    /\b(export|download|save (my |the |this |a )?(desk|world|build|scene|file|html)|save it|keep (a copy|this))\b/.test(t)
+  ) {
+    return envelope(pick(['Saving your desk as HTML.', 'Exporting your world.', 'Here is your HTML file.'], t), {
+      v: 1,
+      type: 'export',
+    });
+  }
 
   const blueprint = findBlueprint(t);
   const color = findColor(t);

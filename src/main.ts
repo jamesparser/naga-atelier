@@ -143,12 +143,25 @@ function start(): void {
 
   const pending: BuildCommand[] = [];
   let onboarding: Onboarding;
+  /** Loose starter/tutorial block key — cleared so agent builds never bury it. */
+  let starterKey: string | null = null;
 
   /** Apply one command now (caller guarantees hands are not mid-carry). */
   const apply = (cmd: BuildCommand): { ok: boolean; speech?: string } => {
+    if (cmd.type === 'export') {
+      downloadWorld(model);
+      sfx.play('chime');
+      say('Saved your desk as HTML.');
+      return { ok: true, speech: 'Saved your desk as HTML.' };
+    }
     const res = executeCommand(model, cmd);
     const now = performance.now();
     if (res.spawn) {
+      // Keep the desk readable: drop the tutorial starter so it is not buried.
+      if (starterKey && model.cells.has(starterKey)) {
+        model.commit('clear starter', model.diff([[starterKey, null]]));
+        starterKey = null;
+      }
       voxels.animateSpawn(res.spawn.order, now);
       sfx.play('cast');
       naga.setMood('casting', 900, now);
@@ -186,6 +199,7 @@ function start(): void {
     naga.caption.heard(text);
     naga.setMood('thinking');
     dock.setMicState('thinking');
+    naga.caption.say('…', 4000);
     const env = await agent.sendText(text);
     dock.setMicState('idle');
     handleEnvelope(env);
@@ -250,6 +264,12 @@ function start(): void {
         if (!apply({ v: 1, type: action }).ok) toast(`Nothing to ${action}`);
         break;
       case 'magic': interaction.cancelAll(); onMagic(); break;
+      case 'export':
+        interaction.cancelAll();
+        downloadWorld(model);
+        sfx.play('chime');
+        say('Saved your desk as HTML.');
+        break;
       case 'recenter':
         sfx.play('click');
         placeDeskNextFrame = true;
@@ -278,9 +298,11 @@ function start(): void {
     chime: () => sfx.play('chime'),
     voiceReady: () => VoiceInput.browserSttAvailable() || (agent.caps.stt && VoiceInput.recordingAvailable()),
     spawnStarterBlock: () => {
-      const k = key(0, 0, 0);
+      // Off-center so a first-asked house never swallows the tutorial block.
+      const k = key(-6, 0, 3);
       if (model.cells.has(k)) return;
       model.commit('starter', model.diff([[k, { c: 'gold', cl: null }]]));
+      starterKey = k;
       voxels.animateSpawn([k], performance.now());
       voxels.pulse([k], performance.now() + 2e4);
     },
