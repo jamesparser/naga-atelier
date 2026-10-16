@@ -310,6 +310,9 @@ function start(): void {
     await renderer.xr.setSession(s);
     landing.classList.add('hidden');
     placeDeskNextFrame = true;
+    // A pinch (select) counts as a user gesture: use it to unlock audio when the session was
+    // started from the browser's own "Enter" chip instead of our button.
+    s.addEventListener('selectstart', () => sfx.unlock());
     s.addEventListener('end', () => {
       session = null;
       voice.stop();
