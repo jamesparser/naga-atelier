@@ -25,8 +25,10 @@ export type DockAction =
   | 'spin' | 'flip' | 'tilt' | 'drop' | 'pause' | 'exit' | 'depth'
   // Sling mode
   | 'retry' | 'next' | 'turnL' | 'turnR' | 'zoom'
+  // arcade games
+  | 'start' | 'fire' | 'totop'
   // mode bar
-  | 'build' | 'sling';
+  | 'build' | 'sling' | 'galago' | 'maze' | 'whack' | 'breakout' | 'tower';
 
 /** What every button says: short label printed under it, longer text in the hover tooltip. */
 export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
@@ -40,6 +42,14 @@ export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
   game: ['TETRIS', 'Play 3D Tetris'],
   sling: ['ANGRY SLING', 'Play Angry Sling'],
   build: ['BUILD', 'Back to building'],
+  galago: ['GALAGO', 'Play Galago: space shooter'],
+  maze: ['MARBLE MAZE', 'Play Marble Maze: tilt to roll'],
+  whack: ['WHACK', 'Play Whack-a-Gloom'],
+  breakout: ['BREAKOUT', 'Play 3D Breakout'],
+  tower: ['TOWER', 'Play Block Tower: pull blocks out'],
+  start: ['NEW GAME', 'Start a new game'],
+  fire: ['FIRE', 'Fire (hold)'],
+  totop: ['TO TOP', 'Put the pulled-out block on top of the tower'],
   exit: ['BACK', 'Back to building'],
   spin: ['SPIN', 'Spin the piece (turn flat)'],
   flip: ['FLIP', 'Flip the piece toward you'],
@@ -86,6 +96,13 @@ export const MODE_LAYOUT: Array<[DockAction, number]> = [
   ['game', 0.02],
   ['sling', 0.02],
 ];
+
+const G = 0.024;
+export const GALAGO_LAYOUT: Array<[DockAction, number]> = [['exit', G], ['start', G], ['fire', 0.03], ['pause', G], ['mic', G]];
+export const MAZE_LAYOUT: Array<[DockAction, number]> = [['exit', G], ['retry', G], ['next', G], ['pause', G], ['mic', G]];
+export const WHACK_LAYOUT: Array<[DockAction, number]> = [['exit', G], ['start', G], ['pause', G], ['mic', G]];
+export const BREAKOUT_LAYOUT: Array<[DockAction, number]> = [['exit', G], ['start', G], ['fire', G], ['next', G], ['pause', G], ['mic', G]];
+export const TOWER_LAYOUT: Array<[DockAction, number]> = [['exit', G], ['start', G], ['totop', G], ['mic', G]];
 
 /** Tetris-mode dock: big flip buttons on the left hand side, drop on the right. */
 export const GAME_LAYOUT: Array<[DockAction, number]> = [
@@ -499,6 +516,40 @@ function iconTexture(id: DockAction): CanvasTexture {
       g.beginPath(); g.arc(56, 56, 28, 0, Math.PI * 2); g.stroke();
       g.beginPath(); g.moveTo(76, 76); g.lineTo(106, 106); g.stroke();
       g.beginPath(); g.moveTo(44, 56); g.lineTo(68, 56); g.moveTo(56, 44); g.lineTo(56, 68); g.stroke();
+      break;
+    case 'galago': // little ship
+      g.beginPath(); g.moveTo(64, 18); g.lineTo(98, 100); g.lineTo(64, 84); g.lineTo(30, 100); g.closePath(); g.fill();
+      break;
+    case 'maze':
+      g.lineWidth = 8;
+      g.strokeRect(22, 22, 84, 84);
+      g.beginPath(); g.moveTo(22, 50); g.lineTo(78, 50); g.moveTo(50, 78); g.lineTo(106, 78); g.moveTo(50, 50); g.lineTo(50, 78); g.stroke();
+      g.beginPath(); g.arc(36, 92, 8, 0, Math.PI * 2); g.fill();
+      break;
+    case 'whack':
+      g.beginPath(); g.ellipse(64, 96, 40, 12, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(64, 70, 22, Math.PI, 0); g.fill();
+      g.fillRect(42, 70, 44, 22);
+      break;
+    case 'breakout':
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) g.fillRect(18 + c * 24, 18 + r * 16, 20, 12);
+      g.beginPath(); g.arc(64, 82, 8, 0, Math.PI * 2); g.fill();
+      g.fillRect(40, 104, 48, 8);
+      break;
+    case 'tower':
+      for (let i = 0; i < 5; i++) g.fillRect(i % 2 ? 40 : 30, 100 - i * 18, i % 2 ? 48 : 68, 12);
+      break;
+    case 'start':
+      g.beginPath(); g.moveTo(40, 26); g.lineTo(100, 64); g.lineTo(40, 102); g.closePath(); g.fill();
+      break;
+    case 'fire':
+      g.beginPath(); g.arc(64, 64, 34, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.arc(64, 64, 12, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.moveTo(64, 14); g.lineTo(64, 34); g.moveTo(64, 94); g.lineTo(64, 114); g.moveTo(14, 64); g.lineTo(34, 64); g.moveTo(94, 64); g.lineTo(114, 64); g.stroke();
+      break;
+    case 'totop':
+      g.fillRect(30, 96, 68, 12); g.fillRect(30, 78, 68, 12);
+      g.beginPath(); g.moveTo(64, 16); g.lineTo(92, 46); g.lineTo(74, 46); g.lineTo(74, 66); g.lineTo(54, 66); g.lineTo(54, 46); g.lineTo(36, 46); g.closePath(); g.fill();
       break;
     case 'build':
     case 'exit': // little house = back to build mode

@@ -74,7 +74,9 @@ Glass shatters easily, wood takes a few hits, stone is tough. Every level is uni
 
 Naga understands open phrasing through an LLM, with a fast deterministic parser for clear commands:
 
-- **Build:** house / cottage, stairs, wall, tower / castle, garden, shelf, arch / gate, bench, fireplace, maze. Add *on the left / right*, *floating*, *tiny / big / huge*, or a colour.
+- **Build (29 ready-made models):** house, castle, tower, lighthouse, windmill, bridge, pyramid, arch, wall, stairs, maze, garden, tree, tent, car, train, sailboat, aeroplane, rocket, robot, dog, snowman, heart, table, chair, bench, bed, shelf, fireplace. Add *on the left / right*, *floating*, *tiny / big / huge*, or a colour.
+- **Anything else:** “build me a dragon”, “a guitar”, “a coffee mug”. When there is no ready-made model, Naga sculpts one from blocks on the spot (the LLM composes it from up to 40 boxes, with named parts you can grab and recolour). It's validated and capped at 500 blocks.
+- **Parts by name:** “paint the wheels gold”, “make the sail blue”, “move the roof left” work on every model's named parts.
 - **Edit:** “make the roof red”, “paint the windows blue”, “a bit bigger / smaller”, “rotate it”, “move it left”.
 - **History:** “undo”, “redo”, “clear the desk”.
 
@@ -94,8 +96,8 @@ Quest Browser (WebXR immersive-ar, hand-tracking)          Vercel
 └─────────────────────────────────────────────┘
 ```
 
-- **Protocol** (`shared/protocol.ts`): versioned `BuildCommand` (`build | clear | color | move | undo | redo | scale | rotate`) inside an `{speech, build}` envelope. Every command is validated before it touches the world.
-- **Blueprints** (`scripts/genBlueprints.mjs` → `src/blueprints/*.json`): 10 hand-authored voxel structures (40–185 blocks each). Each has named parts (`roof`, `walls/windows`, …) that you grab as one piece and can refer to by voice.
+- **Protocol** (`shared/protocol.ts`): versioned `BuildCommand` (`build | sculpt | clear | color | move | undo | redo | scale | rotate`) inside an `{speech, build}` envelope. Every command is validated before it touches the world.
+- **Blueprints** (`scripts/genBlueprints.mjs` → `src/blueprints/*.json`): 29 hand-authored voxel models (40–265 blocks each). Each has named parts (`roof`, `walls/windows`, …) that you grab as one piece and can refer to by voice.
 - **World** (`src/blocks/voxelModel.ts`): every edit is a list of cell changes, so place, move, paint, spawn, scale, rotate and clear all share one 20-step undo stack.
 - **Rendering:** the whole world is a single `InstancedMesh` draw call. Each carried group is one more call. Typical scenes use fewer than 35 draw calls.
 
@@ -130,7 +132,7 @@ The endpoint is public and rate-limited (30 requests per minute per IP). `GET /a
 
 ## Without the agent
 
-Remove the agent and you still have a complete tool: hand sculpting, 10 blueprints from the ★ button, colours, undo/redo, persistence, and **HTML export** (in the debug panel) that saves your desk as a standalone, orbitable 3D page.
+Remove the agent and you still have a complete tool: hand sculpting, 29 blueprints from the ★ button, colours, undo/redo, persistence, and **HTML export** (in the debug panel) that saves your desk as a standalone, orbitable 3D page.
 
 ## License
 

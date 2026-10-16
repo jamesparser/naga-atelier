@@ -201,7 +201,7 @@ const counts = await page.evaluate(() => window.__naga.blueprints.map((id) => {
   const r = window.__naga.apply({ v: 1, type: 'build', blueprintId: id });
   return [id, r.ok, window.__naga.model.size];
 }));
-check('all 10 blueprints spawn', counts.every(([, ok, n]) => ok && n > 20), counts.map(([id, , n]) => `${id}:${n}`).join(' '));
+check('all blueprints spawn', counts.every(([, ok, n]) => ok && n > 20), counts.map(([id, , n]) => `${id}:${n}`).join(' '));
 
 // heavy scene
 await page.evaluate(() => { window.__naga.apply({ v: 1, type: 'clear' }); for (const id of ['house_small', 'tower', 'garden', 'desk_shelf', 'arch', 'fireplace']) window.__naga.apply({ v: 1, type: 'build', blueprintId: id }); });

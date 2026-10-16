@@ -8,13 +8,33 @@
 import type { AgentEnvelope, Anchor, BlueprintId, BuildCommand, PaletteName } from './protocol.js';
 
 const BLUEPRINT_WORDS: Array<[RegExp, BlueprintId, string]> = [
+  // specific things first, so "lighthouse" is not a house and "castle" is not a tower
+  [/\b(light ?house|beacon)\b/, 'lighthouse', 'a lighthouse'],
+  [/\b(wind ?mill|mill)\b/, 'windmill', 'a windmill'],
+  [/\b(bridges?|footbridge|overpass|viaduct)\b/, 'bridge', 'a bridge'],
+  [/\b(rockets?|space ?ships?|spacecraft|missile|shuttle)\b/, 'rocket', 'a rocket'],
+  [/\b(cars?|automobile|vehicle|truck|jeep|taxi|racecar|race car|van)\b/, 'car', 'a car'],
+  [/\b(boats?|ships?|sail ?boat|yacht|canoe|ferry)\b/, 'boat', 'a sailboat'],
+  [/\b(trains?|locomotive|railway|steam engine)\b/, 'train', 'a train'],
+  [/\b(planes?|aeroplane|airplane|jet|aircraft)\b/, 'plane', 'an aeroplane'],
+  [/\b(castles?|fortress|fort|palace|kingdom)\b/, 'castle', 'a castle'],
+  [/\b(pyramids?|ziggurat)\b/, 'pyramid', 'a pyramid'],
+  [/\b(robots?|droid|mech|android)\b/, 'robot', 'a robot'],
+  [/\b(dogs?|puppy|doggy|pup|pet)\b/, 'dog', 'a dog'],
+  [/\b(snow ?man|snowmen|frosty)\b/, 'snowman', 'a snowman'],
+  [/\b(tents?|camping|campsite|camp)\b/, 'tent', 'a tent'],
+  [/\b(hearts?|love)\b/, 'heart', 'a heart'],
+  [/\b(beds?|bunk)\b/, 'bed', 'a bed'],
+  [/\b(tables?|dining table)\b/, 'table', 'a table'],
+  [/\b(chairs?|stool|throne)\b/, 'chair', 'a chair'],
   [/\b(house|cottage|home|hut|cabin)\b/, 'house_small', 'a small cottage'],
   [/\b(stairs?|staircase|steps)\b/, 'stairs', 'some stairs'],
-  [/\b(tower|turret|castle|lighthouse)\b/, 'tower', 'a tower'],
-  [/\b(garden|plants?|flowers?|park|tree)\b/, 'garden', 'a little garden'],
+  [/\b(tower|turret|skyscraper)\b/, 'tower', 'a tower'],
+  [/\b(trees?|oak tree|apple tree)\b/, 'tree', 'a tree'],
+  [/\b(garden|plants?|flowers?|park|lawn)\b/, 'garden', 'a little garden'],
   [/\b(shelf|shelves|bookcase|bookshelf)\b/, 'desk_shelf', 'a desk shelf'],
   [/\b(arch|archway|gate|portal)\b/, 'arch', 'an arch'],
-  [/\b(bench|seat|chair)\b/, 'bench', 'a bench'],
+  [/\b(bench|seat|sofa|couch)\b/, 'bench', 'a bench'],
   [/\b(fireplace|fire ?place|hearth|campfire|fire)\b/, 'fireplace', 'a fireplace'],
   [/\b(maze|labyrinth)\b/, 'maze_tiny', 'a tiny maze'],
   [/\b(wall|fence|barrier)\b/, 'wall', 'a wall'],
@@ -57,6 +77,41 @@ export const CLUSTER_WORDS: Array<[RegExp, string]> = [
   [/\b(flames?|fire)\b/, 'fire'],
   [/\bhearth\b/, 'hearth'],
   [/\b(hedges?|maze walls?)\b/, 'hedges'],
+  [/\b(wheels?|tyres?|tires?)\b/, 'wheels'],
+  [/\bsails?\b/, 'sail'],
+  [/\bmast\b/, 'mast'],
+  [/\bhull\b/, 'hull'],
+  [/\bdeck\b/, 'deck'],
+  [/\b(railings?|rails?|handrails?)\b/, 'railings'],
+  [/\bpiers?\b/, 'piers'],
+  [/\b(river|stream)\b/, 'river'],
+  [/\bwings?\b/, 'wings'],
+  [/\btail\b/, 'tail'],
+  [/\bnose\b/, 'nose'],
+  [/\bfins?\b/, 'fins'],
+  [/\bcockpit\b/, 'cockpit'],
+  [/\b(eyes?)\b/, 'eyes'],
+  [/\bears?\b/, 'ears'],
+  [/\bheads?\b/, 'head'],
+  [/\barms?\b/, 'arms'],
+  [/\bantenna\b/, 'antenna'],
+  [/\bcollar\b/, 'collar'],
+  [/\b(leaves|canopy|foliage)\b/, 'leaves'],
+  [/\btrunk\b/, 'trunk'],
+  [/\bapples?\b/, 'apples'],
+  [/\bhat\b/, 'hat'],
+  [/\bbuttons?\b/, 'buttons'],
+  [/\b(blanket|duvet|covers?)\b/, 'blanket'],
+  [/\bpillows?\b/, 'pillow'],
+  [/\bmattress\b/, 'mattress'],
+  [/\bturrets?\b/, 'turrets'],
+  [/\bkeep\b/, 'keep'],
+  [/\b(head ?lights?|lights?|lamp)\b/, 'lights'],
+  [/\b(wagons?|carriages?|cars of the train)\b/, 'wagons'],
+  [/\bcargo\b/, 'cargo'],
+  [/\bengine\b/, 'engine'],
+  [/\bcab\b/, 'cab'],
+  [/\bblades\b/, 'sails'],
 ];
 
 function pick<T>(arr: T[], seed: string): T {
@@ -230,7 +285,7 @@ export function parseIntent(raw: string): AgentEnvelope | null {
     return envelope('Hi! Ask me to build a house, a tower, or a garden.', null);
   }
   if (/\b(what can you (do|build|make)|help|options|ideas)\b/.test(t)) {
-    return envelope('I can build houses, towers, stairs, arches, gardens, a maze and more.', null);
+    return envelope('I can build houses, castles, bridges, cars, boats, trains, planes, rockets, robots, a dog, and if you describe something new I will sculpt it.', null);
   }
   if (/\b(thanks|thank you|nice|cool|awesome|great|love it)\b/.test(t)) {
     return envelope(pick(['Anytime.', 'Happy to help.', 'Glad you like it.'], t), null);

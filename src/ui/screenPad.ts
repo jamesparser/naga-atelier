@@ -185,3 +185,126 @@ export class ScreenPad {
     this.timers.clear();
   }
 }
+
+const BACK = { id: 'exit', label: 'Back to build', key: 'Esc', tip: 'Leave the game (Esc)' };
+const HELP = { id: 'help', label: 'How to play', key: '?', tip: 'Show all controls' };
+const PAUSE = { id: 'pause', label: 'Pause', key: 'P', tip: 'Pause / resume (P)' };
+const NEW = { id: 'start', label: 'New game', key: 'N', tip: 'Start over (N)' };
+
+export const GALAGO_PAD: PadLayout = {
+  title: 'Galago',
+  hint: 'Blast the alien swarm before it dives into you. Clear a wave to warp to the next.',
+  rows: [
+    [
+      { id: 'left', label: 'Left', key: '←', tip: 'Move left (← or A)', repeat: true },
+      { id: 'up', label: 'Up', key: '↑', tip: 'Move up (↑ or W)', repeat: true },
+      { id: 'down', label: 'Down', key: '↓', tip: 'Move down (↓ or S)', repeat: true },
+      { id: 'right', label: 'Right', key: '→', tip: 'Move right (→ or D)', repeat: true },
+      { id: 'fire', label: 'Fire', key: 'Space', tip: 'Fire (hold Space)', repeat: true, wide: true },
+    ],
+  ],
+  extras: [NEW, PAUSE, HELP, BACK],
+  help: [
+    { head: 'Keyboard', lines: ['Arrows or WASD move your ship', 'Hold Space to fire', 'N new game · P pause · Esc back'] },
+    { head: 'Mouse or touch', lines: ['Press and drag to fly — your ship fires while you hold', 'Or use the buttons'] },
+    { head: 'Quest — hands', lines: ['Pinch and move your hand to fly the ship', 'Your ship fires while you keep pinching', 'Poke NEW GAME / PAUSE on the desk'] },
+    { head: 'Quest — controllers', lines: ['Hold the trigger and move the controller to fly + fire', 'Thumbstick also flies the ship · A/X fires'] },
+  ],
+};
+
+export const MAZE_PAD: PadLayout = {
+  title: 'Marble Maze',
+  hint: 'Tilt the board to roll the marble to the glowing goal. Avoid the holes!',
+  rows: [
+    [
+      { id: 'left', label: 'Tilt left', key: '←', tip: 'Tilt left (hold ← or A)', repeat: true },
+      { id: 'up', label: 'Tilt away', key: '↑', tip: 'Tilt away from you (hold ↑ or W)', repeat: true },
+      { id: 'down', label: 'Tilt toward', key: '↓', tip: 'Tilt toward you (hold ↓ or S)', repeat: true },
+      { id: 'right', label: 'Tilt right', key: '→', tip: 'Tilt right (hold → or D)', repeat: true },
+    ],
+  ],
+  extras: [
+    { id: 'retry', label: 'Retry', key: 'R', tip: 'Restart this maze (R)' },
+    { id: 'next', label: 'Skip', key: 'N', tip: 'Skip to the next maze (N)' },
+    HELP,
+    BACK,
+  ],
+  help: [
+    { head: 'Keyboard', lines: ['Hold the arrows (or WASD) to tilt the board', 'R retry · N skip · Esc back'] },
+    { head: 'Mouse or touch', lines: ['Press and drag: the board tilts the way you drag', 'Let go to level it out'] },
+    { head: 'Quest — hands', lines: ['Pinch anywhere and push your hand the way the marble should roll', 'Open your fingers to level the board'] },
+    { head: 'Quest — controllers', lines: ['Thumbstick tilts the board', 'Or hold the trigger and move the controller'] },
+  ],
+};
+
+export const WHACK_PAD: PadLayout = {
+  title: 'Whack-a-Gloom',
+  hint: 'Bop the gloomlings as they pop up. Gold ones are worth 3 — don’t bop the pebbles!',
+  rows: [
+    [
+      { id: 'hole0', label: 'Back left', key: 'Q', tip: 'Bop back-left hole (Q)' },
+      { id: 'hole1', label: 'Back', key: 'W', tip: 'Bop back-middle hole (W)' },
+      { id: 'hole2', label: 'Back right', key: 'E', tip: 'Bop back-right hole (E)' },
+    ],
+    [
+      { id: 'hole3', label: 'Left', key: 'A', tip: 'Bop middle-left hole (A)' },
+      { id: 'hole4', label: 'Middle', key: 'S', tip: 'Bop middle hole (S)' },
+      { id: 'hole5', label: 'Right', key: 'D', tip: 'Bop middle-right hole (D)' },
+    ],
+    [
+      { id: 'hole6', label: 'Front left', key: 'Z', tip: 'Bop front-left hole (Z)' },
+      { id: 'hole7', label: 'Front', key: 'X', tip: 'Bop front-middle hole (X)' },
+      { id: 'hole8', label: 'Front right', key: 'C', tip: 'Bop front-right hole (C)' },
+    ],
+  ],
+  extras: [NEW, PAUSE, HELP, BACK],
+  help: [
+    { head: 'Keyboard', lines: ['The holes match Q W E / A S D / Z X C', 'N new game · P pause · Esc back'] },
+    { head: 'Mouse or touch', lines: ['Click or tap a gloomling to bop it'] },
+    { head: 'Quest — hands', lines: ['Poke a gloomling with your finger (or pinch it)', 'Use both hands!'] },
+    { head: 'Quest — controllers', lines: ['Touch a gloomling with the controller tip and pull the trigger'] },
+  ],
+};
+
+export const BREAKOUT_PAD: PadLayout = {
+  title: 'Breakout 3D',
+  hint: 'Your paddle is the glass square at the front. Bounce the ball into the brick wall.',
+  rows: [
+    [
+      { id: 'left', label: 'Left', key: '←', tip: 'Move paddle left (← or A)', repeat: true },
+      { id: 'up', label: 'Up', key: '↑', tip: 'Move paddle up (↑ or W)', repeat: true },
+      { id: 'down', label: 'Down', key: '↓', tip: 'Move paddle down (↓ or S)', repeat: true },
+      { id: 'right', label: 'Right', key: '→', tip: 'Move paddle right (→ or D)', repeat: true },
+      { id: 'fire', label: 'Launch', key: 'Space', tip: 'Launch the ball (Space)', wide: true },
+    ],
+  ],
+  extras: [NEW, { id: 'next', label: 'Skip level', key: 'K', tip: 'Skip to the next level (K)' }, PAUSE, HELP, BACK],
+  help: [
+    { head: 'Keyboard', lines: ['Arrows or WASD move the paddle', 'Space launches the ball', 'N new game · K skip · P pause · Esc back'] },
+    { head: 'Mouse or touch', lines: ['Move / drag to steer the paddle, click or tap to launch'] },
+    { head: 'Quest — hands', lines: ['Hold your hand up in front of you — the paddle follows it', 'Pinch to launch the ball'] },
+    { head: 'Quest — controllers', lines: ['The paddle follows your controller', 'Trigger launches · thumbstick also moves the paddle'] },
+  ],
+};
+
+export const TOWER_PAD: PadLayout = {
+  title: 'Block Tower',
+  hint: 'Pull a block out without toppling the tower, then put it on top. How tall can you go?',
+  rows: [
+    [
+      { id: 'prev', label: 'Pick ◀', key: '←', tip: 'Highlight the previous block (←)' },
+      { id: 'up', label: 'Layer up', key: '↑', tip: 'Highlight a block one layer up (↑)' },
+      { id: 'down', label: 'Layer down', key: '↓', tip: 'Highlight a block one layer down (↓)' },
+      { id: 'nextBlock', label: 'Pick ▶', key: '→', tip: 'Highlight the next block (→)' },
+      { id: 'push', label: 'Push out', key: 'Space', tip: 'Give the highlighted block a gentle push (Space)', repeat: true },
+      { id: 'totop', label: 'To top', key: 'T', tip: 'Put the pulled-out block on top of the tower (T)' },
+    ],
+  ],
+  extras: [NEW, HELP, BACK],
+  help: [
+    { head: 'Keyboard', lines: ['Arrows pick a block, Space pushes it out a little', 'T puts the block that sticks out on top', 'N new tower · Esc back'] },
+    { head: 'Mouse or touch', lines: ['Click a block to push it out a little; drag to pull it', 'Then press To top'] },
+    { head: 'Quest — hands', lines: ['Pinch a block and slowly pull it out', 'Let go above the tower to stack it (or poke TO TOP)'] },
+    { head: 'Quest — controllers', lines: ['Touch a block, hold the trigger, and pull'] },
+  ],
+};

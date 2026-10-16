@@ -17,6 +17,25 @@ export const BLUEPRINT_IDS = [
   'bench',
   'fireplace',
   'maze_tiny',
+  'bridge',
+  'car',
+  'boat',
+  'rocket',
+  'castle',
+  'pyramid',
+  'tree',
+  'train',
+  'plane',
+  'table',
+  'chair',
+  'robot',
+  'dog',
+  'snowman',
+  'windmill',
+  'lighthouse',
+  'tent',
+  'heart',
+  'bed',
 ] as const;
 export type BlueprintId = (typeof BLUEPRINT_IDS)[number];
 
@@ -39,6 +58,7 @@ export type Anchor = (typeof ANCHORS)[number];
 
 export const COMMAND_TYPES = [
   'build',
+  'sculpt',
   'clear',
   'color',
   'move',
@@ -75,6 +95,8 @@ export interface BuildCommand {
   dx?: number;
   dy?: number;
   dz?: number;
+  /** sculpt: a freeform shape the agent composed from boxes (anything without a blueprint) */
+  shape?: SculptShape;
   /** game: Tetris mode control */
   action?: GameAction;
   /** game start: which game (default tetris) */
@@ -85,6 +107,45 @@ export interface BuildCommand {
   preset?: GridPresetId;
   message?: string;
   ts?: number;
+}
+
+/** A freeform voxel shape: solid boxes [x, y, z, w, h, d, colour, part] in cells, origin at the min corner. */
+export interface SculptShape {
+  label: string;
+  boxes: Array<[number, number, number, number, number, number, PaletteName, string]>;
+}
+export const SCULPT_LIMITS = { maxBoxes: 40, maxX: 14, maxY: 15, maxZ: 10, maxCells: 500 } as const;
+
+/** Validate a sculpt shape; returns null when nothing usable is left. */
+export function sanitizeShape(raw: unknown): SculptShape | null {
+  if (!isObj(raw)) return null;
+  const boxesRaw = Array.isArray(raw.boxes) ? raw.boxes.slice(0, SCULPT_LIMITS.maxBoxes) : [];
+  const L = SCULPT_LIMITS;
+  const boxes: SculptShape['boxes'] = [];
+  const cells = new Set<string>();
+  for (const b of boxesRaw) {
+    // accept [x,y,z,w,h,d,c,part] or {x,y,z,w,h,d,color,part}
+    const a: unknown[] = Array.isArray(b) ? b : isObj(b) ? [b.x, b.y, b.z, b.w ?? b.sx, b.h ?? b.sy, b.d ?? b.sz, b.color ?? b.c, b.part ?? b.name] : [];
+    const n = a.slice(0, 6).map((v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : NaN));
+    if (n.some((v) => Number.isNaN(v))) continue;
+    let [x, y, z, w, h, d] = n;
+    x = clamp(x, 0, L.maxX - 1); y = clamp(y, 0, L.maxY - 1); z = clamp(z, 0, L.maxZ - 1);
+    w = clamp(w, 1, L.maxX - x); h = clamp(h, 1, L.maxY - y); d = clamp(d, 1, L.maxZ - z);
+    const c = typeof a[6] === 'string' && (PALETTE_NAMES as readonly string[]).includes(a[6]) ? (a[6] as PaletteName) : 'stone';
+    const part = (typeof a[7] === 'string' ? a[7].toLowerCase().replace(/[^a-z_]/g, '').slice(0, 16) : '') || 'body';
+    let added = 0;
+    for (let i = x; i < x + w; i++) for (let j = y; j < y + h; j++) for (let k = z; k < z + d; k++) {
+      if (cells.size >= L.maxCells) break;
+      const key = `${i},${j},${k}`;
+      if (!cells.has(key)) { cells.add(key); added++; }
+    }
+    boxes.push([x, y, z, w, h, d, c, part]);
+    if (cells.size >= L.maxCells) break;
+    void added;
+  }
+  if (cells.size === 0) return null;
+  const label = typeof raw.label === 'string' ? raw.label.replace(/[^\w '-]/g, '').trim().slice(0, 32) : '';
+  return { label: label || 'sculpture', boxes };
 }
 
 /** One round-trip response from the agent endpoint. */
@@ -122,6 +183,15 @@ export function sanitizeCommand(raw: unknown): BuildCommand | null {
       typeof anchor === 'string' && (ANCHORS as readonly string[]).includes(anchor)
         ? (anchor as Anchor)
         : 'desk_center';
+  }
+  if (type === 'sculpt') {
+    // LLMs sometimes nest the shape; accept {shape:{label,boxes}} or top-level label/boxes.
+    const shape = sanitizeShape(isObj(raw.shape) ? raw.shape : raw);
+    if (!shape) return null;
+    cmd.shape = shape;
+    const anchor = raw.anchor;
+    cmd.anchor =
+      typeof anchor === 'string' && (ANCHORS as readonly string[]).includes(anchor) ? (anchor as Anchor) : 'desk_center';
   }
   if (typeof raw.color === 'string' && (PALETTE_NAMES as readonly string[]).includes(raw.color)) {
     cmd.color = raw.color as PaletteName;

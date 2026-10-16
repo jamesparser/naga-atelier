@@ -51,6 +51,28 @@ describe('intent parser', () => {
     ['build an arch', { type: 'build', blueprintId: 'arch' }],
     ['add a shelf', { type: 'build', blueprintId: 'desk_shelf' }],
     ['build a wall', { type: 'build', blueprintId: 'wall' }],
+    ['build me a bridge', { type: 'build', blueprintId: 'bridge' }],
+    ['build me a car', { type: 'build', blueprintId: 'car' }],
+    ['make a red sports car on the right', { type: 'build', blueprintId: 'car', anchor: 'desk_right', color: 'roof_red' }],
+    ['a boat please', { type: 'build', blueprintId: 'boat' }],
+    ['build a spaceship', { type: 'build', blueprintId: 'rocket' }],
+    ['build a castle', { type: 'build', blueprintId: 'castle' }],
+    ['build a lighthouse', { type: 'build', blueprintId: 'lighthouse' }],
+    ['plant a tree', { type: 'build', blueprintId: 'tree' }],
+    ['can you make a train', { type: 'build', blueprintId: 'train' }],
+    ['build an airplane', { type: 'build', blueprintId: 'plane' }],
+    ['build a robot', { type: 'build', blueprintId: 'robot' }],
+    ['make me a puppy', { type: 'build', blueprintId: 'dog' }],
+    ['build a snowman', { type: 'build', blueprintId: 'snowman' }],
+    ['build a windmill', { type: 'build', blueprintId: 'windmill' }],
+    ['build a pyramid', { type: 'build', blueprintId: 'pyramid' }],
+    ['add a table', { type: 'build', blueprintId: 'table' }],
+    ['add a chair', { type: 'build', blueprintId: 'chair' }],
+    ['build a bed', { type: 'build', blueprintId: 'bed' }],
+    ['build a tent', { type: 'build', blueprintId: 'tent' }],
+    ['make a heart', { type: 'build', blueprintId: 'heart' }],
+    ['paint the wheels gold', { type: 'color', color: 'gold', target: 'wheels' }],
+    ['make the sail blue', { type: 'color', color: 'sky', target: 'sail' }],
     ['move it left', { type: 'move', dx: -0.08 }],
     ['rotate it', { type: 'rotate', turns: 1 }],
     ['paint the windows blue', { type: 'color', color: 'sky', target: 'windows' }],
@@ -179,5 +201,41 @@ describe('model + executor (judge test loop)', () => {
     expect(m.size).toBe(0);
     m.undo();
     expect(m.size).toBe(m2.size);
+  });
+});
+
+describe('sculpt (agent-composed shapes)', () => {
+  const mug = {
+    v: 1, type: 'sculpt', label: 'mug',
+    boxes: [[0, 0, 0, 5, 1, 5, 'white', 'mug'], [0, 1, 0, 5, 4, 1, 'white', 'mug'], [5, 2, 2, 2, 1, 1, 'white', 'handle'], [1, 1, 1, 3, 3, 3, 'oak', 'coffee']],
+  };
+  it('sanitizes boxes, clamps sizes and drops junk', () => {
+    const c = sanitizeCommand({ ...mug, boxes: [...mug.boxes, ['x', 1], [-5, 0, 0, 99, 99, 99, 'neon', 'Big Part!']] });
+    expect(c?.type).toBe('sculpt');
+    expect(c?.shape?.boxes.length).toBe(5);
+    const last = c!.shape!.boxes[4];
+    expect(last.slice(0, 6)).toEqual([0, 0, 0, 14, 15, 10]);
+    expect(last[6]).toBe('stone');
+    expect(last[7]).toBe('bigpart');
+    expect(sanitizeCommand({ v: 1, type: 'sculpt', boxes: [] })).toBeNull();
+  });
+  it('accepts a nested shape object too', () => {
+    expect(sanitizeCommand({ type: 'sculpt', shape: { label: 'cup', boxes: [[0, 0, 0, 2, 2, 2, 'sky', 'cup']] } })?.shape?.label).toBe('cup');
+  });
+  it('spawns as one grabbable group with named parts and undoes cleanly', () => {
+    const m = new VoxelModel();
+    const res = executeCommand(m, sanitizeCommand(mug)!);
+    expect(res.ok).toBe(true);
+    expect(m.size).toBeGreaterThan(40);
+    const names = new Set([...m.cells.values()].map((c) => (c.cl ?? "").split(':')[1]));
+    expect(names).toEqual(new Set(['mug', 'mug/handle', 'mug/coffee']));
+    executeCommand(m, { v: 1, type: 'undo' });
+    expect(m.size).toBe(0);
+  });
+  it('caps a huge shape at 500 cells', () => {
+    const c = sanitizeCommand({ type: 'sculpt', label: 'block', boxes: [[0, 0, 0, 14, 15, 10, 'stone', 'block']] })!;
+    const m = new VoxelModel();
+    executeCommand(m, c);
+    expect(m.size).toBeLessThanOrEqual(500);
   });
 });

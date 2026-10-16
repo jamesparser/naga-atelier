@@ -5,7 +5,7 @@
 import type { BuildCommand } from '../../shared/protocol.js';
 import { CELL } from '../config.js';
 import type { VoxelModel } from '../blocks/voxelModel.js';
-import { getBlueprint, planSpawn, type SpawnPlan } from '../blueprints/index.js';
+import { blueprintFromShape, getBlueprint, planSpawn, type SpawnPlan } from '../blueprints/index.js';
 
 export interface ExecResult {
   ok: boolean;
@@ -24,6 +24,14 @@ export function executeCommand(model: VoxelModel, cmd: BuildCommand): ExecResult
       const plan = planSpawn(model, bp, { anchor: cmd.anchor, color: cmd.color, scale: cmd.scale });
       if (plan.changes.length === 0) return { ok: false, speech: 'The desk is too full — clear some space?' };
       model.commit(`build ${bp.id}`, plan.changes, plan.spawnId);
+      return { ok: true, spawn: plan, keys: plan.order };
+    }
+    case 'sculpt': {
+      if (!cmd.shape) return { ok: false, speech: "I couldn't picture that one." };
+      const bp = blueprintFromShape(cmd.shape);
+      const plan = planSpawn(model, bp, { anchor: cmd.anchor, color: cmd.color, scale: cmd.scale });
+      if (plan.changes.length === 0) return { ok: false, speech: 'The desk is too full — clear some space?' };
+      model.commit(`sculpt ${bp.label}`, plan.changes, plan.spawnId);
       return { ok: true, spawn: plan, keys: plan.order };
     }
     case 'export':

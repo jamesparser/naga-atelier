@@ -277,7 +277,7 @@ function start(): void {
   };
 
   let magicIndex = 0;
-  const magicOrder: BlueprintId[] = ['house_small', 'tower', 'garden', 'arch', 'bench', 'stairs', 'fireplace', 'desk_shelf', 'maze_tiny', 'wall'];
+  const magicOrder: BlueprintId[] = ['house_small', 'car', 'castle', 'tree', 'bridge', 'rocket', 'boat', 'robot', 'tower', 'train', 'windmill', 'garden', 'plane', 'dog', 'lighthouse', 'snowman', 'arch', 'pyramid', 'bench', 'table', 'chair', 'bed', 'tent', 'heart', 'stairs', 'fireplace', 'desk_shelf', 'maze_tiny', 'wall'];
   const onMagic = () => {
     const id = magicOrder[magicIndex++ % magicOrder.length];
     const res = apply({ v: 1, type: 'build', blueprintId: id, anchor: 'desk_center' });

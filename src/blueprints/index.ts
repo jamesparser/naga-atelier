@@ -1,7 +1,7 @@
 /**
  * Blueprint registry + placement (pure; no Three.js).
  */
-import type { Anchor, BlueprintId, PaletteName } from '../../shared/protocol.js';
+import type { Anchor, BlueprintId, PaletteName, SculptShape } from '../../shared/protocol.js';
 import { BLUEPRINT_IDS } from '../../shared/protocol.js';
 import { X_MAX, X_MIN, Z_MAX, Z_MIN, GRID_Y } from '../config.js';
 import { key, type Cell, type CellChange, type VoxelModel } from '../blocks/voxelModel.js';
@@ -16,6 +16,25 @@ import arch from './arch.json';
 import bench from './bench.json';
 import fireplace from './fireplace.json';
 import maze_tiny from './maze_tiny.json';
+import bridge from './bridge.json';
+import car from './car.json';
+import boat from './boat.json';
+import rocket from './rocket.json';
+import castle from './castle.json';
+import pyramid from './pyramid.json';
+import tree from './tree.json';
+import train from './train.json';
+import plane from './plane.json';
+import table from './table.json';
+import chair from './chair.json';
+import robot from './robot.json';
+import dog from './dog.json';
+import snowman from './snowman.json';
+import windmill from './windmill.json';
+import lighthouse from './lighthouse.json';
+import tent from './tent.json';
+import heart from './heart.json';
+import bed from './bed.json';
 
 export interface BlueprintVoxel {
   x: number;
@@ -36,10 +55,31 @@ export interface Blueprint {
 
 export const BLUEPRINTS: Record<BlueprintId, Blueprint> = {
   house_small, stairs, wall, tower, garden, desk_shelf, arch, bench, fireplace, maze_tiny,
+  bridge, car, boat, rocket, castle, pyramid, tree, train, plane, table, chair, robot, dog, snowman, windmill, lighthouse, tent, heart, bed,
 } as Record<BlueprintId, Blueprint>;
 
 export function getBlueprint(id: string): Blueprint | null {
   return (BLUEPRINT_IDS as readonly string[]).includes(id) ? BLUEPRINTS[id as BlueprintId] : null;
+}
+
+/** Turn an agent-composed box shape into a one-off blueprint (parts become "<label>/<part>"). */
+export function blueprintFromShape(shape: SculptShape): Blueprint {
+  const group = shape.label.toLowerCase().replace(/[^a-z]+/g, '_').replace(/^_|_$/g, '') || 'sculpture';
+  const vox = new Map<string, BlueprintVoxel>();
+  for (const [x, y, z, w, h, d, c, part] of shape.boxes) {
+    const cl = part === group || part === 'body' ? group : `${group}/${part}`;
+    for (let i = x; i < x + w; i++) for (let j = y; j < y + h; j++) for (let k = z; k < z + d; k++) {
+      if (vox.size >= 500 && !vox.has(key(i, j, k))) continue;
+      vox.set(key(i, j, k), { x: i, y: j, z: k, c, cl }); // later boxes paint over earlier ones
+    }
+  }
+  const voxels = [...vox.values()];
+  const mx = Math.min(...voxels.map((v) => v.x)), my = Math.min(...voxels.map((v) => v.y)), mz = Math.min(...voxels.map((v) => v.z));
+  for (const v of voxels) { v.x -= mx; v.y -= my; v.z -= mz; }
+  voxels.sort((a, b) => a.y - b.y || a.z - b.z || a.x - b.x);
+  const fp = { x: 0, y: 0, z: 0 };
+  for (const v of voxels) { fp.x = Math.max(fp.x, v.x + 1); fp.y = Math.max(fp.y, v.y + 1); fp.z = Math.max(fp.z, v.z + 1); }
+  return { id: 'custom' as BlueprintId, label: shape.label, defaultColor: voxels[0]?.c ?? 'stone', footprint: fp, voxels, clusters: [] };
 }
 
 /** Nearest-neighbour resample of a blueprint's voxels by `scale`. */
