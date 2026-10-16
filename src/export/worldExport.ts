@@ -5,7 +5,7 @@ import { CELL } from '../config.js';
 import { PALETTE } from '../blocks/palette.js';
 import type { VoxelModel } from '../blocks/voxelModel.js';
 
-export function worldHtml(model: VoxelModel, title = 'My Naga Atelier desk'): string {
+export function worldHtml(model: VoxelModel, title = 'My AgentAsia Voxel desk'): string {
   const cells = [...model.cells].map(([k, c]) => [...k.split(',').map(Number), PALETTE[c.c]]);
   const data = JSON.stringify({ cell: CELL, cells });
   return `<!doctype html>
@@ -13,7 +13,7 @@ export function worldHtml(model: VoxelModel, title = 'My Naga Atelier desk'): st
 <title>${title.replace(/</g, '&lt;')}</title>
 <style>html,body{margin:0;height:100%;background:#0e1620;color:#cfe;font:14px system-ui,sans-serif}#h{position:fixed;left:12px;bottom:10px;opacity:.7}</style>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.181.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.181.0/examples/jsm/"}}</script>
-</head><body><div id="h">Built with Naga Atelier · drag to orbit</div>
+</head><body><div id="h">Built with AgentAsia Voxel · drag to orbit</div>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -40,7 +40,7 @@ export function downloadWorld(model: VoxelModel): void {
   const blob = new Blob([worldHtml(model)], { type: 'text/html' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'naga-atelier-world.html';
+  a.download = 'agentasia-voxel-world.html';
   document.body.appendChild(a);
   a.click();
   setTimeout(() => {

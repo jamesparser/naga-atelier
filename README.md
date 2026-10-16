@@ -1,8 +1,8 @@
-# Naga Atelier
+# AgentAsia Voxel
 
 **Talk it into the room. Sculpt it with your hands.**
 
-Naga Atelier is a seated mixed-reality block studio for Meta Quest 3. It runs in the browser (WebXR, nothing to install).
+AgentAsia Voxel is a seated mixed-reality block studio for Meta Quest 3. It runs in the browser (WebXR, nothing to install). Talk to **Naga**, the coiled-serpent companion, and your hands do the rest.
 You say what you want and Naga, a small coiled-serpent companion, drafts it on your real desk in passthrough.
 Then you fix it with your hands: pinch, slide, snap, tap, drop it in the bin, undo. You never need to pick up a controller.
 

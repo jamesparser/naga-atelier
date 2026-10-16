@@ -4,7 +4,7 @@
 
 | Field | Draft |
 |---|---|
-| Name | Naga Atelier |
+| Name | AgentAsia Voxel |
 | Tagline (≤140) | Talk it into the room. Sculpt it with your hands. |
 | Track / Division | Productivity · New Experience |
 | Build URL | https://naga-atelier.vercel.app (WebXR, opens in Quest Browser) |

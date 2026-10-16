@@ -1,5 +1,5 @@
 /**
- * Naga Atelier — entry point. Wires scene, hands, voxel world, agent and onboarding.
+ * AgentAsia Voxel — entry point. Wires scene, hands, voxel world, agent and onboarding.
  */
 import {
   Color,

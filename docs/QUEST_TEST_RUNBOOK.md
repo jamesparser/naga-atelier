@@ -1,4 +1,4 @@
-# Quest 3 test runbook — Naga Atelier
+# Quest 3 test runbook — AgentAsia Voxel
 
 **Live URL:** https://naga-atelier.vercel.app  
 **Date:** keep this next to the headset. Work through top to bottom.
