@@ -51,6 +51,8 @@ in sparkles. Fill a whole layer and you get a big bonus. Blocks above a cleared 
 | Fall faster · Drop now | hold Shift · Space | Faster (hold) · Drop | pull down · flick down | hold grip · trigger |
 | Pause · Help · Back | P · ? · Esc | buttons in the control bar | poke PAUSE / BACK on the desk | press the desk buttons |
 
+**Pick how deep the well is: 1–4 rows.** 1 row plays like classic Tetris (↑ rotates, ↓ falls faster); 2–4 rows add the 3D back/front rows. Use the row buttons on screen, keys 1–4, or poke **ROWS 1-4** on the desk. Changing rows starts a new game, and your choice is remembered (default: 1 row).
+
 Your build desk is untouched while you play. Say **“back to building”** to return to it. Your best score is saved on the device.
 
 ## Angry Sling

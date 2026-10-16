@@ -343,6 +343,7 @@ function start(): void {
     exit: () => setMode('build'),
     mic: () => void onMic(),
     passthrough: () => !!session && xrMode === 'immersive-ar',
+    depthChanged: () => syncPadState(),
   };
   const tetris = new TetrisMode(deskRoot, shadows, gameHost);
   const sling = new SlingMode(deskRoot, shadows, gameHost);
@@ -420,6 +421,12 @@ function start(): void {
       seenHelp.add(m);
     }
     pad.show(layout, first);
+    syncPadState();
+  }
+  function syncPadState(): void {
+    if (mode !== 'game') return;
+    const d = tetris.depth;
+    pad.setState([`depth${d}`], d === 1 ? ['away', 'closer'] : []);
   }
 
   onboarding = new Onboarding({

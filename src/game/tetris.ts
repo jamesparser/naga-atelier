@@ -10,6 +10,7 @@
 import type { PaletteName } from '../../shared/protocol.js';
 
 export const WELL_W = 10;
+/** maximum depth (rows front-to-back); each game picks 1..WELL_D */
 export const WELL_D = 4;
 export const WELL_H = 14;
 
@@ -91,7 +92,11 @@ export class Tetris3D {
   private lockResets = 0;
   private listeners = new Set<(e: TetrisEvent) => void>();
 
-  constructor(seed = Date.now()) {
+  /** rows front-to-back (1 = classic Tetris, 4 = full 3D) */
+  depth: number;
+
+  constructor(seed = Date.now(), depth = WELL_D) {
+    this.depth = Math.max(1, Math.min(WELL_D, Math.round(depth)));
     this.rand = mulberry32(seed);
     this.next = this.draw();
   }
@@ -120,6 +125,11 @@ export class Tetris3D {
     return Math.max(110, 1000 * Math.pow(0.86, this.level - 1));
   }
 
+  /** Change the number of rows (1..4). Takes effect on the next start(). */
+  setDepth(d: number): void {
+    this.depth = Math.max(1, Math.min(WELL_D, Math.round(d)));
+  }
+
   start(): void {
     this.board.clear();
     this.score = 0;
@@ -136,7 +146,7 @@ export class Tetris3D {
   }
 
   free(x: number, y: number, z: number): boolean {
-    if (x < 0 || x >= WELL_W || z < 0 || z >= WELL_D || y < 0) return false;
+    if (x < 0 || x >= WELL_W || z < 0 || z >= this.depth || y < 0) return false;
     if (y >= WELL_H + 4) return false; // allow a little headroom above the rim for rotations
     return !this.board.has(k3(x, y, z));
   }
@@ -163,7 +173,7 @@ export class Tetris3D {
     const def = this.next;
     this.next = this.draw();
     const cells = def.cells.map((c) => [...c] as V3);
-    const pos: V3 = [Math.floor(WELL_W / 2) - 1, WELL_H - 1 - Math.max(...cells.map((c) => c[1])), 1];
+    const pos: V3 = [Math.floor(WELL_W / 2) - 1, WELL_H - 1 - Math.max(...cells.map((c) => c[1])), Math.floor((this.depth - 1) / 2)];
     this.piece = { def, cells, pos };
     this.fallAcc = 0;
     this.lockAcc = 0;
@@ -274,7 +284,7 @@ export class Tetris3D {
   /** Find and clear complete rows; returns nothing, emits a 'clear' event. */
   private clearLines(): void {
     const rows: Array<{ y: number; z: number }> = [];
-    for (let z = 0; z < WELL_D; z++)
+    for (let z = 0; z < this.depth; z++)
       for (let y = 0; y < WELL_H + 4; y++) {
         let full = true;
         for (let x = 0; x < WELL_W && full; x++) full = this.board.has(k3(x, y, z));
@@ -284,13 +294,14 @@ export class Tetris3D {
     // Full layers (every depth slice complete at the same height) score a big bonus.
     const byY = new Map<number, number>();
     for (const r of rows) byY.set(r.y, (byY.get(r.y) ?? 0) + 1);
-    const layers = [...byY].filter(([, n]) => n === WELL_D).map(([y]) => y);
+    // (only meaningful when the well is more than one row deep)
+    const layers = this.depth < 2 ? [] : [...byY].filter(([, n]) => n === this.depth).map(([y]) => y);
 
     const cleared: Array<[V3, PaletteName]> = [];
     for (const { y, z } of rows) for (let x = 0; x < WELL_W; x++) cleared.push([[x, y, z], this.board.get(k3(x, y, z))!]);
 
     // Collapse each depth slice independently, top-down so indices stay valid.
-    for (let z = 0; z < WELL_D; z++) {
+    for (let z = 0; z < this.depth; z++) {
       const ys = rows.filter((r) => r.z === z).map((r) => r.y).sort((a, b) => b - a);
       for (const cy of ys) {
         for (let x = 0; x < WELL_W; x++) this.board.delete(k3(x, cy, z));

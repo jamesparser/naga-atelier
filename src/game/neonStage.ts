@@ -82,7 +82,7 @@ export class NeonStage {
   readonly tint = new Color();
 
   /** The well's front opening (desk-local metres): x in [x0,x1], y in [0,h], back plane at zBack. */
-  constructor(private x0: number, private x1: number, private h: number, private zBack: number) {
+  constructor(private x0: number, private x1: number, private h: number, public zBack: number) {
     this.root.name = 'neon';
     // perimeter of the tunnel cross-section with lane ticks (a vector web like an arcade tube shooter)
     const lanes = 10;

@@ -99,4 +99,33 @@ describe('tetris 3d', () => {
     for (let i = 0; i < 6; i++) { g.board.clear(); g.hardDrop(); seen.add(g.piece!.def.name); }
     expect(seen.size).toBe(7);
   });
+
+  it('1 row deep plays like classic Tetris: lines clear, no layer bonus, pieces stay in the row', () => {
+    const g = new Tetris3D(8, 1);
+    g.start();
+    expect(g.piece!.pos[2]).toBe(0);
+    expect(g.move(0, 0, 1)).toBe(false); // nowhere to go front/back
+    let layers = -1;
+    g.on((e) => { if (e.type === 'clear') layers = e.layers.length; });
+    const cells: Array<[V3, 'stone']> = [];
+    for (let x = 4; x < WELL_W; x++) cells.push([[x, 0, 0], 'stone']);
+    g.setCells(cells);
+    g.setPiece('I', [1, 5, 0]);
+    g.hardDrop();
+    expect(g.lines).toBe(1);
+    expect(layers).toBe(0);
+    expect(g.score).toBeLessThan(1000);
+    // classic rotate (about z) works in one row
+    g.setPiece('T', [4, 8, 0]);
+    expect(g.rotate('z', 1)).toBe(true);
+  });
+
+  it('depth can be changed between games', () => {
+    const g = new Tetris3D(9, 4);
+    g.setDepth(2);
+    g.start();
+    expect(g.depth).toBe(2);
+    expect(g.free(0, 0, 2)).toBe(false);
+    expect(g.free(0, 0, 1)).toBe(true);
+  });
 });

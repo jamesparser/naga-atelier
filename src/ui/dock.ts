@@ -22,7 +22,7 @@ import { deskHalfD } from '../scene/desk.js';
 export type DockAction =
   | 'mic' | 'undo' | 'redo' | 'magic' | 'export' | 'grid' | 'recenter' | 'game' | `swatch:${PaletteName}`
   // Tetris mode
-  | 'spin' | 'flip' | 'tilt' | 'drop' | 'pause' | 'exit'
+  | 'spin' | 'flip' | 'tilt' | 'drop' | 'pause' | 'exit' | 'depth'
   // Sling mode
   | 'retry' | 'next' | 'turnL' | 'turnR' | 'zoom'
   // mode bar
@@ -46,6 +46,7 @@ export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
   tilt: ['TILT', 'Tilt the piece sideways'],
   drop: ['DROP', 'Drop the piece now (or play again)'],
   pause: ['PAUSE', 'Pause / resume'],
+  depth: ['ROWS 1-4', 'How many rows deep: 1 = classic, 4 = full 3D (restarts)'],
   retry: ['RETRY', 'Restart this level'],
   next: ['SKIP LEVEL', 'Skip to the next level (cleared levels advance on their own)'],
   turnL: ['TURN LEFT', 'Turn the arena left'],
@@ -94,6 +95,7 @@ export const GAME_LAYOUT: Array<[DockAction, number]> = [
   ['spin', 0.028],
   ['drop', 0.03],
   ['pause', BIG],
+  ['depth', BIG],
   ['mic', BIG],
 ];
 
@@ -461,6 +463,14 @@ function iconTexture(id: DockAction): CanvasTexture {
       break;
     case 'pause':
       g.fillRect(42, 32, 16, 64); g.fillRect(70, 32, 16, 64);
+      break;
+    case 'depth': // rows going back in perspective
+      for (let i = 0; i < 4; i++) {
+        const w = 84 - i * 14, y = 100 - i * 20;
+        g.globalAlpha = 1 - i * 0.18;
+        g.fillRect(64 - w / 2, y, w, 10);
+      }
+      g.globalAlpha = 1;
       break;
     case 'sling': // Y-shaped fork with a band
       g.beginPath(); g.moveTo(64, 112); g.lineTo(64, 66); g.lineTo(34, 24); g.moveTo(64, 66); g.lineTo(94, 24); g.stroke();

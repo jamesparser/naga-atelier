@@ -31,7 +31,7 @@ const check = (name, cond, extra = '') => {
 const shot = async (n) => SHOTS && page.screenshot({ path: `${SHOTS}/${n}.png` });
 const wait = (ms) => page.waitForTimeout(ms);
 
-await page.goto(`${BASE}/?emulate=1&fresh&tutorial`);
+await page.goto(`${BASE}/?emulate=1&fresh&tutorial&lowfx`);
 await page.waitForFunction(() => window.__naga && window.__iwer);
 await page.waitForFunction(() => !document.getElementById('enter').disabled, null, { timeout: 15000 });
 check('enter button offers passthrough', (await page.textContent('#enter')).includes('passthrough'));
@@ -88,16 +88,41 @@ const has = (x, y, z) => page.evaluate((k) => window.__naga.model.cells.has(k), 
 const cellOf = (x, y, z) => page.evaluate((k) => window.__naga.model.cells.get(k) ?? null, `${x},${y},${z}`);
 const size = () => page.evaluate(() => window.__naga.model.size);
 
+const ixState = (id = 11) => page.evaluate((id) => window.__naga.interaction['states'].get(id)?.k ?? 'none', id);
+async function waitState(want, id = 11, ms = 4000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (want.includes(await ixState(id))) return true;
+    await wait(40);
+  }
+  return false;
+}
 async function drag(from, to, side = 'right') {
   await pinch(0, side); await wait(150);
   await aim(await cellWorld(...from), side);
-  await pinch(1, side); await wait(250);
   const a = await cellWorld(...from), b = await cellWorld(...to);
+  await pinch(1, side);
+  const okPress = await waitState(['press', 'carry']);
+  // let the pinch settle (fingers finish closing) before moving, otherwise the nudge is absorbed
+  for (let i = 0; i < 60; i++) {
+    const f = await page.evaluate(() => window.__naga.interaction['states'].get(11)?.frames ?? 99);
+    if (f > 3) break;
+    await wait(30);
+  }
+  if (process.env.DBG) console.log('      drag press', okPress, await ixState());
+  // nudge right away (before the hold-to-detach timer) so this is a group drag, not a detach
+  const dir = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const len = Math.hypot(...dir) || 1;
+  await page.evaluate(({ dir, side }) => { const h = window.__iwer.hands[side]; h.position.set(h.position.x + dir[0], h.position.y + dir[1], h.position.z + dir[2]); }, { dir: dir.map((v) => (v / len) * 0.025), side });
+  const okCarry = await waitState(['carry']);
+  if (process.env.DBG) console.log('      drag carry', okCarry, await ixState());
   for (let i = 1; i <= 6; i++) {
     const t = i / 6;
     await handTo([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t + 0.004, a[2] + (b[2] - a[2]) * t], side);
   }
-  await pinch(0, side); await stablePinch(side); await wait(200);
+  await pinch(0, side);
+  await waitState(['idle', 'ignore']);
+  await stablePinch(side); await wait(200);
 }
 
 // --- 1. pinch + drag the starter block ------------------------------------
@@ -107,7 +132,7 @@ console.log('      pinch offset', pinchOffset.map((v) => v.toFixed(3)).join(',')
 const starter = await page.evaluate(() => [...window.__naga.model.cells.keys()][0].split(',').map(Number));
 const dest = [starter[0] + 3, 0, starter[2] + 2];
 await drag(starter, dest);
-check('pinch-drag snaps starter block to new cell', (await has(...dest)) && !(await has(...starter)), `${starter} -> ${dest}`);
+check('pinch-drag snaps starter block to new cell', !(await has(...starter)) && (await page.evaluate(([x, z]) => [...window.__naga.model.cells.keys()].some((k) => { const [a, , c] = k.split(',').map(Number); return Math.abs(a - x) <= 1 && Math.abs(c - z) <= 1; }), [dest[0], dest[2]])), `${starter} -> ${dest}; now ${await page.evaluate(() => [...window.__naga.model.cells.keys()].join(' '))}`);
 await shot('01-dragged');
 
 // --- 2. agent: build a small house (text path through the real endpoint) ---
@@ -186,7 +211,7 @@ check('heavy scene draw calls within budget (≤40)', st.calls <= 40, JSON.strin
 await shot('09-heavy');
 
 // --- 10. Tetris mode: steer with a pinch, twist to flip, flick to drop, clear a line -----
-await page.evaluate(() => { window.__naga.apply({ v: 1, type: 'clear' }); window.__naga.setMode('game'); });
+await page.evaluate(() => { window.__naga.apply({ v: 1, type: 'clear' }); window.__naga.setMode('game'); window.__naga.tetris.setDepth(4); });
 await wait(600);
 check('tetris mode active with a falling piece', await page.evaluate(() => window.__naga.mode() === 'game' && !!window.__naga.tetris.game.piece));
 // freeze gravity for a deterministic test

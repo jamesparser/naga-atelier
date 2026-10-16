@@ -86,3 +86,5 @@ button.ghost.ok { border-color: var(--accent); color: var(--accent); }
   .pad-mini kbd { display: none; }
 }
 @media (pointer: coarse) { .pad-btn kbd, .pad-mini kbd { display: none; } }
+.pad-mini.selected, .pad-btn.selected { border-color: var(--gold); color: var(--gold); background: rgba(255, 209, 102, 0.14); }
+.pad-mini[data-id^="depth"] { padding: 5px 8px; }

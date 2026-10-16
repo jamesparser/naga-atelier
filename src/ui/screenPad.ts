@@ -26,7 +26,7 @@ export interface PadLayout {
 
 export const TETRIS_PAD: PadLayout = {
   title: 'Tetris',
-  hint: 'Fill a straight row left-to-right to blast it. The well is 4 rows deep: use Back/Front to change row.',
+  hint: 'Fill a straight row left-to-right to blast it. Pick how many rows deep (1 = classic, 4 = hardest).',
   rows: [
     [
       { id: 'left', label: 'Left', key: '←', tip: 'Move left (← or A)', repeat: true },
@@ -43,14 +43,19 @@ export const TETRIS_PAD: PadLayout = {
     ],
   ],
   extras: [
+    { id: 'depth1', label: '1 row', key: '1', tip: 'Classic Tetris: 1 row deep (key 1). Restarts the game.' },
+    { id: 'depth2', label: '2', key: '2', tip: '2 rows deep (key 2). Restarts the game.' },
+    { id: 'depth3', label: '3', key: '3', tip: '3 rows deep (key 3). Restarts the game.' },
+    { id: 'depth4', label: '4 rows', key: '4', tip: 'Full 3D: 4 rows deep (key 4). Restarts the game.' },
     { id: 'pause', label: 'Pause', key: 'P', tip: 'Pause / resume (P)' },
     { id: 'help', label: 'How to play', key: '?', tip: 'Show all controls' },
     { id: 'exit', label: 'Back to build', key: 'Esc', tip: 'Leave the game (Esc)' },
   ],
   help: [
-    { head: 'Keyboard', lines: ['← → move left / right', '↑ ↓ move to the back / front row', 'Q or E spin · R flip · F tilt', 'Shift hold = faster · Space = drop', 'P pause · Esc back to build'] },
+    { head: 'Rows deep', lines: ['1 row = classic Tetris (easiest) · 2–4 rows = 3D', 'Keys 1–4, the row buttons, or ROWS on the desk', 'Changing rows starts a new game'] },
+    { head: 'Keyboard', lines: ['← → move left / right', '↑ ↓ move to the back / front row (with 1 row: ↑ rotate, ↓ faster)', 'Q or E spin · R flip · F tilt', 'Shift hold = faster · Space = drop', 'P pause · Esc back to build'] },
     { head: 'Mouse or touch', lines: ['Drag on the game to slide the piece', 'Quick click / tap = spin', 'Use the buttons for flip, tilt, drop'] },
-    { head: 'Quest — hands', lines: ['Pinch anywhere and move your hand to slide the piece', 'Pinch and twist your wrist to flip it', 'Quick pinch = spin · flick down = drop', 'Poke the labelled buttons on the desk'] },
+    { head: 'Quest — hands', lines: ['Pinch anywhere and move your hand to slide the piece', 'Pinch and twist your wrist to flip it', 'Quick pinch = spin · flick down = drop', 'Poke the labelled buttons on the desk', 'Poke ROWS 1-4 to pick how deep (1 = classic)'] },
     { head: 'Quest — controllers', lines: ['Thumbstick: left / right, push up = back row, down = front row', 'A or X = spin · B or Y = flip · press stick = tilt', 'Hold grip = faster · trigger = drop'] },
   ],
 };
@@ -94,6 +99,14 @@ export class ScreenPad {
     });
   }
 
+  /** Highlight the selected choice (e.g. rows deep) and hide buttons that don't apply. */
+  setState(selected: string[], hidden: string[] = []): void {
+    for (const b of this.el.querySelectorAll<HTMLButtonElement>('button[data-id]')) {
+      b.classList.toggle('selected', selected.includes(b.dataset.id!));
+      b.style.display = hidden.includes(b.dataset.id!) ? 'none' : '';
+    }
+  }
+
   show(layout: PadLayout | null, firstTime = false): void {
     this.layout = layout;
     this.stopAll();
@@ -127,6 +140,7 @@ export class ScreenPad {
     btn.type = 'button';
     btn.className = `${cls}${b.wide ? ' wide' : ''}${b.id === 'drop' ? ' accent' : ''}`;
     btn.title = b.tip;
+    btn.dataset.id = b.id;
     btn.setAttribute('aria-label', b.tip);
     btn.innerHTML = `<span class="lbl">${b.label}</span>${b.key ? `<kbd>${b.key}</kbd>` : ''}`;
     btn.addEventListener('pointerdown', (e) => {

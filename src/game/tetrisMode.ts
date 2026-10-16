@@ -42,8 +42,8 @@ import type { Pointer } from '../hands/handInput.js';
 import { Tetris3D, WELL_D, WELL_H, WELL_W, type Axis, type Piece, type TetrisEvent, type V3 } from './tetris.js';
 
 /** Well cell -> desk grid cell. The well sits centred on the build grid. */
-const OX = -WELL_W / 2, OZ = -WELL_D / 2;
-const toDesk = ([x, y, z]: V3): V3 => [x + OX, y, z + OZ];
+const OX = -WELL_W / 2, OZ = -WELL_D / 2; // OZ = layout reference for panels (deepest well)
+const DEPTH_KEY = 'naga-atelier:tetris-depth:v1';
 
 const TWIST_RAD = (50 * Math.PI) / 180;
 /** The game always uses 4 cm cubes, whatever block-size preset the build grid uses. */
@@ -69,6 +69,8 @@ export interface TetrisHost {
   say(text: string): void;
   /** true when the headset shows passthrough (dims the room less) */
   passthrough?(): boolean;
+  /** the row count changed (update on-screen controls) */
+  depthChanged?(depth: number): void;
   celebrate(): void;
   exit(): void;
   mic(): void;
@@ -98,6 +100,9 @@ export class TetrisMode {
   private panel: { canvas: HTMLCanvasElement; tex: CanvasTexture; mesh: Mesh; last: string };
   private best = 0;
   private stage: NeonStage;
+  private frame = new Group();
+  /** rows front-to-back the player chose (1 = classic, 4 = full 3D) */
+  depth = 1;
   private music = new SynthMusic();
   private neon = neonMaterial();
   active = false;
@@ -116,33 +121,8 @@ export class TetrisMode {
     this.sparkles = new Sparkles(this.well);
     this.root.add(this.dock.root);
 
-    // Well frame: glowing edges + faint glass back and sides so depth reads in passthrough.
-    const x0 = OX * CELL, x1 = (OX + WELL_W) * CELL, z0 = OZ * CELL, z1 = (OZ + WELL_D) * CELL, h = WELL_H * CELL;
-    const e: number[] = [];
-    const seg = (a: number[], b: number[]) => e.push(...a, ...b);
-    for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) seg([x, 0, z], [x, h, z]);
-    for (const y of [0, h]) {
-      seg([x0, y, z0], [x1, y, z0]); seg([x0, y, z1], [x1, y, z1]);
-      seg([x0, y, z0], [x0, y, z1]); seg([x1, y, z0], [x1, y, z1]);
-    }
-    for (let x = 1; x < WELL_W; x++) seg([x0 + x * CELL, 0.001, z0], [x0 + x * CELL, 0.001, z1]);
-    for (let z = 1; z < WELL_D; z++) seg([x0, 0.001, z0 + z * CELL], [x1, 0.001, z0 + z * CELL]);
-    const fg = new BufferGeometry();
-    fg.setAttribute('position', new Float32BufferAttribute(e, 3));
     this.frameMat = new LineBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: 0.9, blending: AdditiveBlending, depthWrite: false });
-    this.well.add(new LineSegments(fg, this.frameMat));
-    const glass = new MeshBasicMaterial({ color: 0x3a1a6a, transparent: true, opacity: 0.16, depthWrite: false });
-    const back = new Mesh(new PlaneGeometry(x1 - x0, h), glass);
-    back.position.set((x0 + x1) / 2, h / 2, z0);
-    const left = new Mesh(new PlaneGeometry(z1 - z0, h), glass);
-    left.rotation.y = Math.PI / 2;
-    left.position.set(x0, h / 2, (z0 + z1) / 2);
-    const right = left.clone();
-    right.position.x = x1;
-    const floor = new Mesh(new PlaneGeometry(x1 - x0, z1 - z0), new MeshBasicMaterial({ color: 0x12002a, transparent: true, opacity: 0.6, depthWrite: false }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set((x0 + x1) / 2, 0.0008, (z0 + z1) / 2);
-    this.well.add(back, left, right, floor);
+    this.well.add(this.frame);
 
     // Score panel + next-piece preview to the right of the well.
     const canvas = document.createElement('canvas');
@@ -168,6 +148,13 @@ export class TetrisMode {
     this.root.add(card);
     this.stage = new NeonStage(OX * TCELL, (OX + WELL_W) * TCELL, WELL_H * TCELL, OZ * TCELL);
     this.root.add(this.stage.root);
+    try {
+      this.depth = Math.max(1, Math.min(WELL_D, Number(localStorage.getItem(DEPTH_KEY) ?? 1) || 1));
+    } catch {
+      /* ignore */
+    }
+    this.game.setDepth(this.depth);
+    this.buildFrame();
 
     try {
       this.best = Number(localStorage.getItem(BEST_KEY) ?? 0) || 0;
@@ -175,6 +162,69 @@ export class TetrisMode {
       /* ignore */
     }
     this.game.on((ev) => this.onGameEvent(ev));
+  }
+
+  private get oz(): number {
+    return -this.depth / 2;
+  }
+  private toDesk([x, y, z]: V3): V3 {
+    return [x + OX, y, z + this.oz];
+  }
+
+  /** Glowing edges + faint glass back and sides for the chosen depth. */
+  private buildFrame(): void {
+    for (const c of [...this.frame.children]) {
+      this.frame.remove(c);
+      (c as Mesh).geometry?.dispose();
+    }
+    const x0 = OX * CELL, x1 = (OX + WELL_W) * CELL, z0 = this.oz * CELL, z1 = (this.oz + this.depth) * CELL, h = WELL_H * CELL;
+    const e: number[] = [];
+    const seg = (a: number[], b: number[]) => e.push(...a, ...b);
+    for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) seg([x, 0, z], [x, h, z]);
+    for (const y of [0, h]) {
+      seg([x0, y, z0], [x1, y, z0]); seg([x0, y, z1], [x1, y, z1]);
+      seg([x0, y, z0], [x0, y, z1]); seg([x1, y, z0], [x1, y, z1]);
+    }
+    for (let x = 1; x < WELL_W; x++) seg([x0 + x * CELL, 0.001, z0], [x0 + x * CELL, 0.001, z1]);
+    for (let z = 1; z < this.depth; z++) seg([x0, 0.001, z0 + z * CELL], [x1, 0.001, z0 + z * CELL]);
+    const fg = new BufferGeometry();
+    fg.setAttribute('position', new Float32BufferAttribute(e, 3));
+    this.frame.add(new LineSegments(fg, this.frameMat));
+    const glass = new MeshBasicMaterial({ color: 0x3a1a6a, transparent: true, opacity: 0.16, depthWrite: false });
+    const back = new Mesh(new PlaneGeometry(x1 - x0, h), glass);
+    back.position.set((x0 + x1) / 2, h / 2, z0);
+    const left = new Mesh(new PlaneGeometry(z1 - z0, h), glass);
+    left.rotation.y = Math.PI / 2;
+    left.position.set(x0, h / 2, (z0 + z1) / 2);
+    const right = left.clone();
+    right.position.x = x1;
+    const floor = new Mesh(new PlaneGeometry(x1 - x0, z1 - z0), new MeshBasicMaterial({ color: 0x12002a, transparent: true, opacity: 0.6, depthWrite: false }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set((x0 + x1) / 2, 0.0008, (z0 + z1) / 2);
+    this.frame.add(back, left, right, floor);
+    this.stage.zBack = this.oz * TCELL;
+  }
+
+  /** Choose 1–4 rows deep (restarts the game). 1 row plays like classic Tetris. */
+  setDepth(d: number): void {
+    const nd = Math.max(1, Math.min(WELL_D, Math.round(d)));
+    this.depth = nd;
+    try {
+      localStorage.setItem(DEPTH_KEY, String(nd));
+    } catch {
+      /* ignore */
+    }
+    this.game.setDepth(nd);
+    this.buildFrame();
+    this.builtVersion = -1;
+    this.shownPiece = null;
+    if (this.active) {
+      this.game.start();
+      this.music.start(sfx.ctx, 1);
+    }
+    sfx.play('chime');
+    this.host.say(nd === 1 ? '1 row deep — classic Tetris. New game!' : `${nd} rows deep. New game!`);
+    this.host.depthChanged?.(nd);
   }
 
   enter(): void {
@@ -199,7 +249,7 @@ export class TetrisMode {
   }
 
   /** Dock / voice actions. */
-  action(a: DockAction | 'left' | 'right' | 'away' | 'closer' | 'down'): void {
+  action(a: DockAction | 'left' | 'right' | 'away' | 'closer' | 'down' | 'depth1' | 'depth2' | 'depth3' | 'depth4'): void {
     const g = this.game;
     if (g.state === 'over' && (a === 'drop' || a === 'spin')) {
       g.start();
@@ -207,10 +257,16 @@ export class TetrisMode {
       this.host.say('New game. Good luck!');
       return;
     }
+    // One row deep = classic Tetris: up rotates, down falls faster.
+    if (this.depth === 1 && a === 'away') a = 'spin';
+    else if (this.depth === 1 && a === 'closer') a = 'down';
     switch (a) {
-      case 'spin': g.rotate('y', 1); break;
-      case 'flip': g.rotate('x', 1); break;
+      // With one row there is no depth to turn into, so every turn button is a classic rotate.
+      case 'spin': if (this.depth === 1) g.rotate('z', -1); else g.rotate('y', 1); break;
+      case 'flip': if (this.depth === 1) g.rotate('z', 1); else g.rotate('x', 1); break;
       case 'tilt': g.rotate('z', 1); break;
+      case 'depth1': case 'depth2': case 'depth3': case 'depth4': this.setDepth(Number(a.slice(5))); break;
+      case 'depth': this.setDepth((this.depth % WELL_D) + 1); break;
       case 'drop': g.hardDrop(); break;
       case 'left': g.move(-1, 0, 0); break;
       case 'right': g.move(1, 0, 0); break;
@@ -240,6 +296,7 @@ export class TetrisMode {
       q: 'spin', e: 'spin', r: 'flip', f: 'tilt',
       // Falling: hold Shift (or X) = faster, Space (or Enter) = drop now.
       Shift: 'down', x: 'down', ' ': 'drop', Enter: 'drop',
+      '1': 'depth1', '2': 'depth2', '3': 'depth3', '4': 'depth4',
       p: 'pause', Escape: 'exit',
     };
     const a = map[k];
@@ -338,7 +395,7 @@ export class TetrisMode {
     const tx = g.startX + Math.round(d.x / TCELL);
     const tz = g.startZ + Math.round(d.z / TCELL);
     for (let i = 0; i < WELL_W && piece === game.piece && piece.pos[0] !== tx; i++) if (!game.move(Math.sign(tx - piece.pos[0]), 0, 0)) break;
-    for (let i = 0; i < WELL_D && piece === game.piece && piece.pos[2] !== tz; i++) if (!game.move(0, 0, Math.sign(tz - piece.pos[2]))) break;
+    for (let i = 0; i < this.depth && piece === game.piece && piece.pos[2] !== tz; i++) if (!game.move(0, 0, Math.sign(tz - piece.pos[2]))) break;
     const want = Math.floor(-d.y / (TCELL * 1.2));
     while (want > g.dropped && piece === game.piece) {
       if (!game.move(0, -1, 0)) break;
@@ -424,7 +481,7 @@ export class TetrisMode {
         sfx.play(big ? 'bigclear' : 'clear', 1 + 0.06 * Math.min(4, ev.rows.length));
         const c = new Vector3();
         for (const [cell, color] of ev.cells) {
-          const [x, y, z] = toDesk(cell);
+          const [x, y, z] = this.toDesk(cell);
           this.sparkles.burst(cellCenter(x, y, z, c), PALETTE[color], big ? 9 : 6, (big ? 0.5 : 0.35) / this.s);
         }
         // One shock ring per cleared height (several rows at the same height share it).
@@ -473,7 +530,7 @@ export class TetrisMode {
       this.builtVersion = g.version;
       this.boardModel.cells.clear();
       for (const [k, color] of g.board) {
-        const [x, y, z] = toDesk(k.split(',').map(Number) as V3);
+        const [x, y, z] = this.toDesk(k.split(',').map(Number) as V3);
         this.boardModel.cells.set(key(x, y, z), { c: color, cl: null });
       }
       this.boardModel.version++;
@@ -488,13 +545,13 @@ export class TetrisMode {
         this.pieceMesh.show(this.rel(piece));
         this.shownPiece = sig;
       }
-      const [dx, dy, dz] = toDesk(piece.pos);
+      const [dx, dy, dz] = this.toDesk(piece.pos);
       if (fresh) this.visualY = dy;
       this.visualY += (dy - this.visualY) * Math.min(1, dt * 18);
       if (Math.abs(this.visualY - dy) > 3) this.visualY = dy;
       this.pieceMesh.group.position.copy(cellCenter(dx, this.visualY, dz));
       const gp = g.ghostPos();
-      if (gp) this.ghost.show(piece.cells.map(([x, y, z]) => toDesk([gp[0] + x, gp[1] + y, gp[2] + z])), true);
+      if (gp) this.ghost.show(piece.cells.map(([x, y, z]) => this.toDesk([gp[0] + x, gp[1] + y, gp[2] + z])), true);
     } else {
       this.pieceMesh.hide();
       this.ghost.hide();
@@ -526,7 +583,7 @@ export class TetrisMode {
   private drawPanel(): void {
     const g = this.game;
     const state = g.state === 'paused' ? 'PAUSED' : g.state === 'over' ? 'GAME OVER' : '';
-    const sig = `${g.score}|${g.lines}|${g.level}|${this.best}|${state}`;
+    const sig = `${g.score}|${g.lines}|${g.level}|${this.best}|${state}|${this.depth}`;
     if (sig === this.panel.last) return;
     this.panel.last = sig;
     const c = this.panel.canvas.getContext('2d')!;
@@ -553,6 +610,8 @@ export class TetrisMode {
     c.fillStyle = '#9fb3c8';
     c.font = '600 32px system-ui, sans-serif';
     c.fillText(`BEST ${Math.max(this.best, g.score)}`, 44, 580);
+    c.fillStyle = '#7fd8ff';
+    c.fillText(`ROWS ${this.depth}`, 44, 540);
     if (state) {
       c.fillStyle = g.state === 'over' ? '#ff8a8a' : '#ffd166';
       c.font = '800 54px system-ui, sans-serif';
