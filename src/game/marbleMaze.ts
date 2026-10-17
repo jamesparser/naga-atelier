@@ -138,14 +138,15 @@ export class MarbleMaze extends GameBase {
 
   constructor(deskRoot: Object3D, host: GameHost) {
     super(deskRoot, host, MAZE_LAYOUT, MAZE_PAD, 'naga-atelier:maze-best:v1', 'maze');
-    this.board.position.set(0, 0.03, -0.06);
+    // high enough that a fully tilted corner (~2.6 cm drop) stays above the table
+    this.board.position.set(0, 0.062, -0.06);
     this.root.add(this.board);
     const base = new Mesh(new BoxGeometry(BOARD + 0.02, 0.012, BOARD + 0.02), new MeshStandardMaterial({ color: 0xc89b62, roughness: 0.7 }));
     base.position.y = -0.006;
     this.board.add(base);
     // a stand under the board so it reads as a tilting toy, not a floating slab
-    const stand = new Mesh(new CylinderGeometry(0.02, 0.03, 0.03, 16), new MeshStandardMaterial({ color: 0x5b4632, roughness: 0.8 }));
-    stand.position.set(0, 0.015, -0.06);
+    const stand = new Mesh(new CylinderGeometry(0.02, 0.03, 0.062, 16), new MeshStandardMaterial({ color: 0x5b4632, roughness: 0.8 }));
+    stand.position.set(0, 0.031, -0.06);
     this.root.add(stand);
     this.walls = new InstancedMesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial({ color: 0x8a5a33, roughness: 0.6 }), 400);
     this.walls.frustumCulled = false;

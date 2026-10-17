@@ -80,6 +80,7 @@ export const COMMAND_TYPES = [
   'info',
   'save',
   'load',
+  'board',
 ] as const;
 export const INFO_QUESTIONS = ['count', 'describe', 'size', 'saves'] as const;
 export type InfoQuestion = (typeof INFO_QUESTIONS)[number];

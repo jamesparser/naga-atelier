@@ -6,6 +6,7 @@
 import {
   CylinderGeometry,
   Group,
+  Line3,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -53,7 +54,7 @@ export class WhackAGloom extends GameBase {
 
   constructor(deskRoot: Object3D, host: GameHost) {
     super(deskRoot, host, WHACK_LAYOUT, WHACK_PAD, 'naga-atelier:whack-best:v1', 'whack');
-    const lawn = new Mesh(new CylinderGeometry(0.2, 0.21, 0.012, 48), new MeshStandardMaterial({ color: 0x3f8f4f, roughness: 0.9 }));
+    const lawn = new Mesh(new CylinderGeometry(0.2, 0.21, 0.012, 48), new MeshStandardMaterial({ color: 0xd9a35b, roughness: 0.9 }) /* sandy dune, so it stands out on the green board */);
     lawn.position.set(0, 0.006, -0.05);
     this.root.add(lawn);
     const holeMat = new MeshBasicMaterial({ color: 0x0b0d10 });
@@ -180,10 +181,16 @@ export class WhackAGloom extends GameBase {
       const p = f.p;
       const tip = p.indexTip && p.kind !== 'mouse' ? this.deskRoot.worldToLocal(p.indexTip.clone()) : null;
       this.holes.forEach((h, i) => {
-        const head = h.centre.clone().setY(UP_Y * h.h + HEAD_R);
+        // hit zone: the whole popped-up body (hole rim → just above the head), nudged toward the
+        // face side, so a poke at the face or body counts — not only a dead-centre head tap
+        const moleY = h.centre.y - HEAD_R * 1.4 + (UP_Y + HEAD_R * 1.4) * h.h;
+        const a = new Vector3(h.centre.x, h.centre.y, h.centre.z + HEAD_R * 0.35);
+        const b = new Vector3(h.centre.x, Math.max(h.centre.y, moleY + HEAD_R * 0.6), h.centre.z + HEAD_R * 0.35);
+        const seg = new Line3(a, b);
+        const dist = (pt: Vector3) => seg.closestPointToPoint(pt, true, new Vector3()).distanceTo(pt);
         if (tip) {
           const k = `${p.id}:${i}`;
-          const inside = tip.distanceTo(head) < HEAD_R * 1.3;
+          const inside = dist(tip) < HEAD_R * 1.6;
           if (inside && !this.tipWasIn.get(k)) this.bop(i);
           this.tipWasIn.set(k, inside);
         }
@@ -191,8 +198,8 @@ export class WhackAGloom extends GameBase {
           let near = false;
           if (p.kind === 'mouse') {
             const ray = this.mouseRayLocal();
-            near = ray ? ray.distanceSqToPoint(head) < (HEAD_R * 1.4) ** 2 : Math.hypot(f.local.x - h.centre.x, f.local.z - h.centre.z) < HEAD_R * 1.6;
-          } else near = f.local.distanceTo(head) < HEAD_R * 1.6;
+            near = ray ? ray.distanceSqToSegment(a, b) < (HEAD_R * 1.7) ** 2 : Math.hypot(f.local.x - h.centre.x, f.local.z - h.centre.z) < HEAD_R * 1.9;
+          } else near = dist(f.local) < HEAD_R * 1.9;
           if (near) this.bop(i);
         }
       });

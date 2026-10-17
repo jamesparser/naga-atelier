@@ -189,6 +189,13 @@ export function parseIntent(raw: string): AgentEnvelope | null {
   if (/^ (drop( it)?|slam( it)?|hard drop) $/.test(t)) {
     return envelope('Drop!', { v: 1, type: 'game', action: 'drop' });
   }
+  // --- board colour: "make the board blue", "board colour black", "clear board" -------------
+  if (/\b(board|base ?plate|build mat|mat)\b/.test(t) && !/\b(game|tetris|floor ?plan)\b/.test(t)) {
+    if (/\b(clear|see.?through|transparent|invisible)\b/.test(t)) return envelope('See-through board.', { v: 1, type: 'board', color: 'glass' });
+    const c = findColor(t);
+    if (c) return envelope(`The board is ${c[1]} now.`, { v: 1, type: 'board', color: c[0] });
+    if (/\b(colou?r|change|next|switch)\b/.test(t)) return envelope('New board colour.', { v: 1, type: 'board' });
+  }
   // --- history ---------------------------------------------------------
   if (/\b(redo|do that again|put it back)\b/.test(t)) {
     return envelope('Redone.', { v: 1, type: 'redo' });

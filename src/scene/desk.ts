@@ -38,6 +38,21 @@ export function trashPos(): Vector3 {
 export const TRASH_POS = new Vector3(DESK_HALF_W + 0.075, 0, 0.02);
 export const TRASH_RADIUS = 0.055;
 
+/** Board shades for each palette colour: a little darker than the blocks so builds stand out. */
+export const BOARD_COLORS = {
+  grass: 0x2f7d45,
+  oak: 0x7a5a3c,
+  sky: 0x2a5f93,
+  water: 0x23727a,
+  stone: 0x575e66,
+  white: 0xd9dde2,
+  ink: 0x1a2028,
+  gold: 0xb08a2e,
+  roof_red: 0x7f3530,
+  glass: 0x1b2a3a,
+} as const;
+export const BOARD_ORDER = ['grass', 'oak', 'sky', 'stone', 'ink', 'white', 'roof_red', 'gold', 'water', 'glass'] as const;
+
 export interface DeskVisuals {
   root: Group;
   /** Visual-only "real desk" slab used in VR mode (hidden in passthrough). */
@@ -45,6 +60,8 @@ export interface DeskVisuals {
   trash: Group;
   setTrashHot(hot: boolean): void;
   setGridEmphasis(on: boolean): void;
+  /** Colour the build board (a palette name, or 'glass' for see-through). */
+  setBoardColor(name: string): void;
   /** Show/hide the build mat, grid and VR desk slab (games bring their own floor). */
   setDecorVisible(on: boolean, vr: boolean): void;
 }
@@ -62,11 +79,10 @@ export function buildDesk(shadows: boolean): DeskVisuals {
     catcher.receiveShadow = true;
     root.add(catcher);
   }
-  // Faint mat that marks the build area.
-  const mat = new Mesh(
-    new PlaneGeometry(w, d),
-    new MeshBasicMaterial({ color: 0x1b2a3a, transparent: true, opacity: 0.16, depthWrite: false }),
-  );
+  // The build board: a coloured baseplate under the grid (green by default, changeable).
+  const boardMat = new MeshStandardMaterial({ color: BOARD_COLORS.grass, roughness: 0.9, transparent: true, opacity: 0.92, depthWrite: false });
+  const mat = new Mesh(new PlaneGeometry(w, d), boardMat);
+  mat.receiveShadow = shadows;
   mat.rotation.x = -Math.PI / 2;
   mat.position.y = 0.001;
   mat.renderOrder = 1;
@@ -136,6 +152,14 @@ export function buildDesk(shadows: boolean): DeskVisuals {
     setDecorVisible(on, vr) {
       for (const d of decor) d.visible = on;
       vrDesk.visible = vr;
+    },
+    setBoardColor(name) {
+      const hex = BOARD_COLORS[name as keyof typeof BOARD_COLORS];
+      if (hex === undefined) return;
+      boardMat.color.setHex(hex);
+      boardMat.opacity = name === 'glass' ? 0.16 : 0.92;
+      // light grid lines on dark boards, dark lines on light boards
+      gridMat.color.setHex(name === 'white' || name === 'gold' ? 0x2a3440 : 0xbfe6ff);
     },
     setGridEmphasis(on) {
       gridMat.opacity = on ? 0.32 : 0.16;

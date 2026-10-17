@@ -168,35 +168,35 @@ export class Naga {
     const target = tmpColor(MOOD_COLOR[this.mood]);
     const k = Math.min(1, dt * 8);
     for (const c of [this.heartMat.emissive, this.shellMat.emissive, this.haloMat.color, this.ringMat.color, this.coilMat.emissive, this.moteMat.color]) c.lerp(target, k);
-    const speedBy: Record<NagaMood, number> = { idle: 0.6, listening: 1.4, thinking: 3.5, speaking: 1.2, casting: 6, happy: 2, resting: 0.15 };
+    const speedBy: Record<NagaMood, number> = { idle: 0.25, listening: 0.6, thinking: 1.6, speaking: 0.5, casting: 2.8, happy: 0.9, resting: 0.08 };
     const sp = speedBy[this.mood];
     this.coil.rotation.y += dt * sp;
-    this.flow.offset.x -= dt * (0.25 + sp * 0.35); // light runs up the serpent
-    this.heart.rotation.x += dt * (0.4 + sp * 0.6);
-    this.heart.rotation.y += dt * (0.7 + sp);
+    this.flow.offset.x -= dt * (0.12 + sp * 0.2); // light runs slowly up the serpent
+    this.heart.rotation.x += dt * (0.15 + sp * 0.3);
+    this.heart.rotation.y += dt * (0.3 + sp * 0.5);
     // the ring tilts toward you while listening and spins while thinking
     const tilt = this.mood === 'listening' ? 0.9 : this.mood === 'thinking' ? 0.35 : 0;
     this.ring.rotation.x += (Math.PI / 2 - tilt - this.ring.rotation.x) * k;
-    this.ring.rotation.z += dt * (this.mood === 'thinking' ? 4 : 0.5);
+    this.ring.rotation.z += dt * (this.mood === 'thinking' ? 1.6 : 0.2);
     this.pop = Math.max(0, this.pop - dt * 2.5);
-    const breathe = 1 + 0.04 * Math.sin(now / 600);
+    const breathe = 1 + 0.04 * Math.sin(now / 1100);
     const talk = this.mood === 'speaking' || this.mood === 'listening' ? this.level * 0.25 : 0;
     const s = breathe + talk + this.pop * 0.35;
     this.heart.scale.setScalar(s * (1 + talk * 0.8));
     this.shell.scale.setScalar(breathe + this.pop * 0.2);
-    this.halo.scale.setScalar(s * (1.1 + 0.15 * Math.sin(now / 300)));
+    this.halo.scale.setScalar(s * (1.1 + 0.12 * Math.sin(now / 700)));
     this.ring.scale.setScalar(1 + this.pop * 0.25 + talk * 0.2);
     this.haloMat.opacity = this.mood === 'resting' ? 0.05 : 0.14 + talk * 0.5 + this.pop * 0.3;
     this.coilMat.emissiveIntensity = this.mood === 'resting' ? 0.4 : 1.3 + talk * 2 + this.pop;
     for (let i = 0; i < MOTES; i++) {
-      const a = now / 1000 * (0.6 + (i % 5) * 0.15) * (1 + sp * 0.3) + i * 2.39;
+      const a = now / 1000 * (0.25 + (i % 5) * 0.06) * (1 + sp * 0.3) + i * 2.39;
       const r = 0.058 + (i % 3) * 0.008 + this.pop * 0.03;
       const y = Math.sin(a * 0.7 + i) * 0.035;
       this.motePos.set([Math.cos(a) * r, y, Math.sin(a) * r], i * 3);
     }
     (this.motes.geometry.attributes.position as BufferAttribute).needsUpdate = true;
     this.moteMat.opacity = this.mood === 'resting' ? 0.2 : 0.75;
-    this.root.position.y = this.home.y + 0.008 * Math.sin(now / 900);
+    this.root.position.y = this.home.y + 0.008 * Math.sin(now / 1600);
     this.caption.update(now);
   }
 }

@@ -51,7 +51,7 @@ import { Breakout3D } from './game/breakout.js';
 import { BlockTower } from './game/blockTower.js';
 import { FlapBro } from './game/flapBro.js';
 import { MikePenguin } from './game/mikePenguin.js';
-import { DESK_HALF_W, DESK_HALF_D } from './scene/desk.js';
+import { BOARD_COLORS, BOARD_ORDER, DESK_HALF_W, DESK_HALF_D } from './scene/desk.js';
 
 async function boot(): Promise<void> {
   if (QUERY.has('emulate')) {
@@ -207,6 +207,25 @@ function start(): void {
   let starterKey: string | null = null;
 
   /** Apply one command now (caller guarantees hands are not mid-carry). */
+  // board colour (green by default), remembered on this device
+  const BOARD_KEY = 'naga-atelier:board:v1';
+  let boardColor = 'grass';
+  const setBoard = (name: string) => {
+    boardColor = name;
+    desk.setBoardColor(name);
+    try {
+      localStorage.setItem(BOARD_KEY, name);
+    } catch {
+      /* ignore */
+    }
+  };
+  try {
+    const b = localStorage.getItem(BOARD_KEY);
+    if (b && b in BOARD_COLORS) boardColor = b;
+  } catch {
+    /* ignore */
+  }
+  desk.setBoardColor(boardColor);
   // named layouts ("save this as kitchen", "load kitchen") live on this device
   const SAVES_KEY = 'naga-atelier:saves:v1';
   const readSaves = (): Record<string, ReturnType<VoxelModel['toJSON']>> => {
@@ -217,6 +236,14 @@ function start(): void {
     }
   };
   const apply = (cmd: BuildCommand): { ok: boolean; speech?: string; answer?: boolean } => {
+    if (cmd.type === 'board') {
+      const cur = BOARD_ORDER.indexOf(boardColor as (typeof BOARD_ORDER)[number]);
+      const next = cmd.color && cmd.color in BOARD_COLORS ? cmd.color : BOARD_ORDER[(cur + 1) % BOARD_ORDER.length];
+      setBoard(next);
+      sfx.play('paint');
+      const word: Record<string, string> = { grass: 'green', oak: 'wood brown', sky: 'blue', water: 'teal', stone: 'grey', ink: 'black', roof_red: 'red', glass: 'see-through' };
+      return { ok: true, speech: `The board is ${word[next] ?? next} now.`, answer: true };
+    }
     if (cmd.type === 'info') {
       const target = cmd.target && cmd.target !== 'all' ? model.resolveTarget(cmd.target) : null;
       const names = Object.keys(readSaves());
@@ -442,6 +469,9 @@ function start(): void {
         sfx.play('chime');
         say('Saved your desk as HTML.');
         break;
+      case 'board':
+        say(apply({ v: 1, type: 'board' }).speech ?? '');
+        break;
       case 'clear':
         interaction.cancelAll();
         if (apply({ v: 1, type: 'clear' }).ok) say(model.canUndo() ? 'Desk cleared. Tap UNDO to bring it back.' : 'The desk is already clear.');
@@ -515,7 +545,8 @@ function start(): void {
   const tetris = new TetrisMode(deskRoot, shadows, gameHost);
   const sling = new SlingMode(deskRoot, shadows, gameHost);
   // Mode switcher on the left edge of the desk: build · tetris · sling, always reachable.
-  const modeBar = new Dock(MODE_LAYOUT, { x: -DESK_HALF_W - 0.045, zFront: DESK_HALF_D + 0.03, labels: { build: 'BUILD', arcade: 'ARCADE' } });
+  // sits a little back from the front edge so BUILD isn't crowded against the dock's VOICE button
+  const modeBar = new Dock(MODE_LAYOUT, { x: -DESK_HALF_W - 0.045, zFront: DESK_HALF_D - 0.045, labels: { build: 'BUILD', arcade: 'PLAY ARCADE GAMES' } });
   modeBar.setSelected('build');
   deskRoot.add(modeBar.root);
   const modeBarPinch = new Map<number, boolean>();

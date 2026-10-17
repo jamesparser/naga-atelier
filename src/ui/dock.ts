@@ -25,7 +25,7 @@ export type DockAction =
   | 'spin' | 'flip' | 'tilt' | 'drop' | 'pause' | 'exit' | 'depth'
   // Sling mode
   | 'retry' | 'next' | 'turnL' | 'turnR' | 'zoom'
-  | 'clear'
+  | 'clear' | 'board'
   // arcade games
   | 'start' | 'fire' | 'totop' | 'flap' | 'jump'
   // mode bar + arcade picker
@@ -40,11 +40,12 @@ export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
   export: ['SAVE', 'Save your desk as a web page'],
   grid: ['BLOCK SIZE', 'Change block size (your build comes along)'],
   clear: ['CLEAR', 'Clear the desk (UNDO brings it back)'],
+  board: ['BOARD', 'Change the board colour'],
   recenter: ['RECENTER', 'Move the desk in front of you'],
   game: ['TETRIS', 'Play 3D Tetris'],
   sling: ['ANGRY SLING', 'Play Angry Sling'],
   build: ['BUILD', 'Back to building'],
-  arcade: ['ARCADE', 'More games: pick one'],
+  arcade: ['PLAY ARCADE GAMES', 'Play arcade games: Tetris, Angry Sling and 7 more'],
   flapbro: ['FLAP BRO', 'Play Flap Bro: first-person flapping'],
   penguin: ['MIKE PENGUIN', 'Play Mike Penguin: first-person ice run'],
   flap: ['FLAP', 'Flap your wings'],
@@ -84,6 +85,7 @@ export const BUILD_LAYOUT: Array<[DockAction, number]> = [
   ['export', 0.018],
   ['grid', 0.018],
   ['clear', 0.018],
+  ['board', 0.018],
   ['recenter', BIG],
 ];
 
@@ -196,8 +198,9 @@ export class Dock {
         this.buttons.push(this.makeButton(id, r, new Vector3(column.x, 0, z)));
         const text = column.labels?.[id] ?? DOCK_LABELS[id]?.[0];
         if (text) {
-          const lab = labelMesh(text, 'right');
-          lab.position.set(column.x - r - 0.036, 0.002, z);
+          const lw = text.length > 10 ? 0.11 : 0.064;
+          const lab = labelMesh(text, 'right', lw);
+          lab.position.set(column.x - r - 0.004 - lw / 2, 0.002, z);
           this.root.add(lab);
         }
         z -= r + gap;
@@ -485,6 +488,11 @@ function iconTexture(id: DockAction): CanvasTexture {
       g.closePath(); g.fill();
       break;
     }
+    case 'board': // a tiled square
+      g.lineWidth = 6;
+      g.strokeRect(24, 24, 80, 80);
+      g.beginPath(); g.moveTo(51, 24); g.lineTo(51, 104); g.moveTo(77, 24); g.lineTo(77, 104); g.moveTo(24, 51); g.lineTo(104, 51); g.moveTo(24, 77); g.lineTo(104, 77); g.stroke();
+      break;
     case 'clear': // sweep: a broom over a cross
       g.lineWidth = 10;
       g.beginPath(); g.moveTo(34, 34); g.lineTo(94, 94); g.moveTo(94, 34); g.lineTo(34, 94); g.stroke();

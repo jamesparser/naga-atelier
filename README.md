@@ -105,6 +105,7 @@ Naga understands open phrasing through an LLM, with a fast deterministic parser 
   - “how many blocks”, “what's on my desk”, “how tall is the castle”: spoken answers with real-world sizes in centimetres
   - “save this as kitchen”, “load kitchen”, “list my saves”: named layouts kept on the device; loading is one step you can undo
 - **Context-aware:** each request sends the AI a short summary of what's on the desk (objects, where they are, their parts), so “put a lamp next to the bed” and “paint the table legs black” refer to real things.
+- **Board colour:** the build board starts green; “make the board blue”, “board colour black”, “clear board” (see-through), or tap **BOARD** on the dock to cycle colours. Your choice is remembered.
 - **Grid and history:** “I need more room” (a finer grid that keeps your build), “undo”, “redo”, “clear the desk” (or the CLEAR button; UNDO brings it back).
 
 If the agent is unreachable, every hand interaction still works, and typed or recognised commands fall back to the on-device parser.

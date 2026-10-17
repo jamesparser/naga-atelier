@@ -89,6 +89,7 @@ export function executeCommand(model: VoxelModel, cmd: BuildCommand): ExecResult
     case 'game':
       return { ok: false, speech: 'Game commands are handled by the game mode.' };
     case 'info':
+    case 'board':
     case 'save':
     case 'load':
       return { ok: false, speech: 'That is answered by the app.' };
