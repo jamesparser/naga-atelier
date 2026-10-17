@@ -37,7 +37,7 @@ const LANE = 0.7;
 const ROAD_DROP = 0.62; // road surface below your eyes
 const FAR = -40;
 const STAGE_M = 420;
-const STAGE_TIME = 45;
+const STAGE_TIME = 40;
 const JUMP_V = 2.6, G = -9;
 
 type ObKind = 'hole' | 'crack' | 'seal' | 'fish';
@@ -181,7 +181,7 @@ export class MikePenguin extends GameBase {
   }
 
   private topSpeed(): number {
-    return (this.slow ? 4.5 : 8.5) + Math.min(3, (this.stage - 1) * 0.8);
+    return (this.slow ? 5.5 : 10.5) + Math.min(3.5, (this.stage - 1) * 1);
   }
 
   private go(): boolean {
@@ -303,7 +303,7 @@ export class MikePenguin extends GameBase {
         this.speed = Math.max(0, this.speed - 18 * dt);
       } else {
         const top = this.topSpeed();
-        this.speed += (top - this.speed) * Math.min(1, dt * (this.speed < top ? 0.9 : 3));
+        this.speed += (top - this.speed) * Math.min(1, dt * (this.speed < top ? 1.3 : 3));
       }
       const dz = this.speed * dt;
       this.dist += dz;
@@ -373,7 +373,7 @@ export class MikePenguin extends GameBase {
     this.world.position.set(this.eye.x - this.laneShown * LANE, this.eye.y - ROAD_DROP - this.jumpY + bob, this.eye.z);
     this.world.rotation.z = this.stumble > 0 ? Math.sin(this.stumble * 18) * 0.03 : (this.lane - this.laneShown) * 0.05;
     // skates on ice: hiss follows your speed
-    sfx.loop('ice', this.state === 'play' && this.jumpY === 0 ? Math.min(0.6, this.speed / 14) : 0, 2500 + this.speed * 250);
+    sfx.loop('ice', this.state === 'play' && this.jumpY === 0 ? Math.min(0.2, this.speed / 50) : 0, 2500 + this.speed * 200); // soft skate hiss
     if (this.jumpY === 0 && this.jumpV === 0 && this.landed === false) { this.landed = true; sfx.play('thud'); }
     if (this.jumpY > 0) this.landed = false;
     this.draw(now, dt);
@@ -398,7 +398,7 @@ export class MikePenguin extends GameBase {
       if (r() < 0.7) this.obs.push({ kind: 'fish', lane: lanes[2], z: z - 0.01, hit: false });
     }
     if (r() < 0.4) this.obs.push({ kind: 'fish', lane: Math.floor(r() * 3) - 1, z: z - 4, hit: false });
-    this.nextSpawn = at + Math.max(6, 11 - diff * 4) * (0.8 + r() * 0.5);
+    this.nextSpawn = at + Math.max(5.5, 10 - diff * 4) * (0.8 + r() * 0.5);
   }
 
   private draw(now: number, dt: number): void {

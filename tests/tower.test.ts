@@ -36,6 +36,31 @@ describe('block tower physics', () => {
     expect(b.body.position.x).toBeGreaterThan(0.5);
     expect(towerFell(blocks, b.body)).toBe(false);
   });
+  it('sliding a held block out does not drag the tower with it (tight block, top block, keyboard push)', () => {
+    for (const pick of [(b: { layer: number; slot: number; thin: boolean }) => !b.thin && b.layer >= 4 && b.layer <= 8, (b: { layer: number; slot: number }) => b.layer === 11 && b.slot === 0]) {
+      const w = createTowerWorld();
+      const blocks = createTower(w, 12, false);
+      for (let i = 0; i < 60; i++) w.step(1 / 120); // let the tower settle first
+      const held = blocks.find(pick)!;
+      const others = blocks.filter((b) => b !== held);
+      const start = others.map((b) => b.body.position.clone());
+      const home = held.body.position.clone();
+      const ax = held.body.quaternion.vmult(new CANNON.Vec3(1, 0, 0));
+      holdBlock(held.body, true);
+      for (let i = 0; i < 360; i++) {
+        // the hand pulls along the block, a little off-axis and slightly downward, like a real hand
+        const want = home.vadd(ax.scale((i / 360) * 1.3)).vadd(new CANNON.Vec3(0.03, -0.02, 0.03));
+        driveHeld(held.body, home, want, 1 / 15);
+        w.step(1 / 120);
+      }
+      holdBlock(held.body, false);
+      for (let i = 0; i < 120; i++) w.step(1 / 120);
+      expect(towerFell(others, null)).toBe(false);
+      const moved = Math.max(...others.map((b, i) => b.body.position.vsub(start[i]).length()));
+      expect(moved).toBeLessThan(0.25); // blocks may settle a little into the gap, but nothing is shoved
+      expect(held.body.position.vsub(home).length()).toBeGreaterThan(0.75);
+    }
+  });
   it('has some loose blocks, and loaded blocks are hard to move', () => {
     const w = createTowerWorld();
     const blocks = createTower(w, 12, false);

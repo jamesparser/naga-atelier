@@ -32,14 +32,15 @@ import { FLAPBRO_PAD } from '../ui/screenPad.js';
 import { GameBase, type GameHost, type PointerFrame } from './gameBase.js';
 
 export const FLAPBRO_NAME = 'Flap Bro';
-const GRAVITY = -5.2;
-const FLAP_V = 2.0;
-const SPEED0 = 2.2;
-const SPACING = 2.8;
-const GAP = 0.78;
+// tuned to be friendly: floaty gravity, small hops, wide gaps far apart
+const GRAVITY = -3.4;
+const FLAP_V = 1.45;
+const SPEED0 = 1.8;
+const SPACING = 4.2;
+const GAP = 1.1;
 const WALL_W = 2.4, WALL_D = 0.35, WALL_H = 3;
 const FLOOR = -1.25, CEIL = 1.25;
-const FAR = -14;
+const FAR = -18;
 
 interface Wall {
   z: number;
@@ -147,7 +148,7 @@ export class FlapBro extends GameBase {
 
   private newWall(z: number): Wall {
     const prev = this.walls[this.walls.length - 1]?.gap ?? 0;
-    const span = Math.min(0.55, 0.3 + this.score * 0.02);
+    const span = Math.min(0.45, 0.2 + this.score * 0.015); // next gap is never far from the last
     let gap = prev + (Math.random() * 2 - 1) * span;
     gap = Math.max(FLOOR + GAP / 2 + 0.15, Math.min(CEIL - GAP / 2 - 0.15, gap));
     return { z, gap, passed: false, hue: Math.random() };
@@ -213,12 +214,12 @@ export class FlapBro extends GameBase {
       this.vAlt += GRAVITY * dt;
       this.alt += this.vAlt * dt;
       if (this.alt > CEIL - 0.1) { this.alt = CEIL - 0.1; this.vAlt = Math.min(0, this.vAlt); }
-      this.speed = SPEED0 + Math.min(1.6, this.score * 0.06);
+      this.speed = SPEED0 + Math.min(1.0, this.score * 0.04);
       for (const w of this.walls) {
         const before = w.z;
         w.z += this.speed * dt;
         // crossing your eye plane: inside the gap or crash
-        if (before < WALL_D / 2 && w.z > -WALL_D / 2 && Math.abs(this.alt - w.gap) > GAP / 2 - 0.07) this.crash();
+        if (before < WALL_D / 2 && w.z > -WALL_D / 2 && Math.abs(this.alt - w.gap) > GAP / 2 - 0.03) this.crash();
         if (!w.passed && w.z > WALL_D / 2) {
           w.passed = true;
           this.score++;

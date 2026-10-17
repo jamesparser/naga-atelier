@@ -46,8 +46,8 @@ export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
   sling: ['ANGRY SLING', 'Play Angry Sling'],
   build: ['BUILD', 'Back to building'],
   arcade: ['PLAY ARCADE GAMES', 'Play arcade games: Tetris, Angry Sling and 7 more'],
-  flapbro: ['FLAP BRO', 'Play Flap Bro: first-person flapping'],
-  penguin: ['MIKE PENGUIN', 'Play Mike Penguin: first-person ice run'],
+  flapbro: ['FLAP BRO', 'Flap Bro: flap through the gaps'],
+  penguin: ['MIKE PENGUIN', 'Mike Penguin: race across the ice'],
   flap: ['FLAP', 'Flap your wings'],
   jump: ['JUMP', 'Jump'],
   swarm: ['STAR SWARM', 'Play Star Swarm: space shooter'],
@@ -433,7 +433,13 @@ function tooltipMesh(): Mesh & { userData: { text?: string; draw?: (t: string) =
   m.userData.draw = (text: string) => {
     const g = c.getContext('2d')!;
     g.clearRect(0, 0, c.width, c.height);
-    g.font = '700 46px system-ui, sans-serif';
+    // shrink long tooltips to fit instead of cutting them off
+    let size = 44;
+    g.font = `700 ${size}px system-ui, sans-serif`;
+    while (g.measureText(text).width > c.width - 56 && size > 24) {
+      size -= 2;
+      g.font = `700 ${size}px system-ui, sans-serif`;
+    }
     const w = Math.min(c.width - 8, g.measureText(text).width + 48);
     g.fillStyle = 'rgba(255,209,102,0.95)';
     g.beginPath();

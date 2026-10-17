@@ -94,7 +94,9 @@ export function buildDesk(shadows: boolean): DeskVisuals {
   for (let z = Z_MIN; z <= Z_MAX + 1; z++) pts.push(X_MIN * CELL, 0, z * CELL, (X_MAX + 1) * CELL, 0, z * CELL);
   const gridGeo = new BufferGeometry();
   gridGeo.setAttribute('position', new Float32BufferAttribute(pts, 3));
-  const gridMat = new LineBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.16, depthWrite: false });
+  // bright lines so the grid reads clearly on the coloured board
+  const gridMat = new LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false });
+  let gridBase = 0.5;
   const grid = new LineSegments(gridGeo, gridMat);
   grid.position.y = 0.0015;
   root.add(grid);
@@ -159,10 +161,13 @@ export function buildDesk(shadows: boolean): DeskVisuals {
       boardMat.color.setHex(hex);
       boardMat.opacity = name === 'glass' ? 0.16 : 0.92;
       // light grid lines on dark boards, dark lines on light boards
-      gridMat.color.setHex(name === 'white' || name === 'gold' ? 0x2a3440 : 0xbfe6ff);
+      const light = name === 'white' || name === 'gold';
+      gridMat.color.setHex(light ? 0x2a3440 : 0xffffff);
+      gridBase = name === 'glass' ? 0.3 : light ? 0.4 : 0.5;
+      gridMat.opacity = gridBase;
     },
     setGridEmphasis(on) {
-      gridMat.opacity = on ? 0.32 : 0.16;
+      gridMat.opacity = on ? Math.min(0.9, gridBase + 0.3) : gridBase;
     },
   };
 }

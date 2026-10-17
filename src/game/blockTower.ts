@@ -290,7 +290,7 @@ export class BlockTower extends GameBase {
         const b = this.grab.block.body;
         // where the block centre must be so the grabbed point lands on the hand
         const offset = b.pointToWorldFrame(this.grab.localPt).vsub(b.position);
-        driveHeld(b, this.grab.home, this.grab.target.vsub(offset), 1 / 30);
+        driveHeld(b, this.grab.home, this.grab.target.vsub(offset), 1 / 15);
       } else if (this.auto) {
         driveHeld(this.auto.block.body, this.auto.home, this.auto.goal, 1 / 12);
         this.auto.t += 1 / 120;

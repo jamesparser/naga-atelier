@@ -19,6 +19,11 @@ export interface TowerBlock {
 
 export const THIN = 0.012;
 
+/** Every tower block uses BLOCK_MAT; the block in your hand switches to HELD_MAT, which barely
+ * grips its neighbours, so sliding it out doesn't drag the rest of the tower along. */
+export const BLOCK_MAT = new CANNON.Material('block');
+export const HELD_MAT = new CANNON.Material('held');
+
 export function createTowerWorld(): CANNON.World {
   const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
   world.broadphase = new CANNON.SAPBroadphase(world);
@@ -33,7 +38,15 @@ export function createTowerWorld(): CANNON.World {
   cm.contactEquationRelaxation = 3;
   cm.frictionEquationStiffness = 1e9;
   cm.frictionEquationRelaxation = 3;
-  const ground = new CANNON.Body({ mass: 0, shape: new CANNON.Box(new CANNON.Vec3(3, 0.25, 3)) });
+  world.addContactMaterial(new CANNON.ContactMaterial(HELD_MAT, BLOCK_MAT, {
+    friction: 0.02,
+    restitution: 0,
+    contactEquationStiffness: 1e9,
+    contactEquationRelaxation: 3,
+    frictionEquationStiffness: 1e9,
+    frictionEquationRelaxation: 3,
+  }));
+  const ground = new CANNON.Body({ mass: 0, shape: new CANNON.Box(new CANNON.Vec3(3, 0.25, 3)), material: BLOCK_MAT });
   ground.position.set(0, -0.25, 0);
   world.addBody(ground);
   return world;
@@ -53,6 +66,7 @@ export function makeBlockBody(world: CANNON.World, layer: number, slot: number, 
     mass: 0.6,
     shape: new CANNON.Box(new CANNON.Vec3(BL / 2, h / 2, BW / 2)),
     position: new CANNON.Vec3(p.x, p.y - (BH - h) / 2, p.z),
+    material: BLOCK_MAT,
     sleepSpeedLimit: 0.05,
     sleepTimeLimit: 0.6,
     linearDamping: 0.08,
@@ -99,19 +113,37 @@ export function driveHeld(body: CANNON.Body, homeCentre: CANNON.Vec3, desiredCen
   const ax = longAxis(body);
   ax.y = 0;
   ax.normalize();
-  const d = desiredCentre.vsub(homeCentre);
-  const along = d.dot(ax);
-  let goal: CANNON.Vec3;
-  if (Math.abs(along) < BL * 0.92) goal = homeCentre.vadd(ax.scale(along));
-  else goal = desiredCentre;
+  const along = desiredCentre.vsub(homeCentre).dot(ax);
+  const cur = body.position.vsub(homeCentre).dot(ax);
+  if (Math.abs(cur) < BL * 1.02) {
+    // still inside the tower: it slides along its own length and passes through its neighbours,
+    // so pulling can never shove the tower — what's left must hold itself up, like real blocks
+    body.type = CANNON.Body.KINEMATIC;
+    body.collisionResponse = false;
+    const target = Math.max(-BL * 1.2, Math.min(BL * 1.2, along));
+    const vAl = Math.max(-0.7, Math.min(0.7, (target - cur) / Math.max(dt, 0.03)));
+    const side = new CANNON.Vec3(-ax.z, 0, ax.x);
+    const drift = body.position.vsub(homeCentre).dot(side);
+    body.velocity.set(ax.x * vAl - side.x * drift * 8, (homeCentre.y - body.position.y) * 8, ax.z * vAl - side.z * drift * 8);
+    body.angularVelocity.set(0, 0, 0);
+    return;
+  }
+  // fully out: solid again, carried by your hand (bumping the tower with it can still knock it)
+  body.type = CANNON.Body.DYNAMIC;
+  body.collisionResponse = true;
+  const goal = desiredCentre.clone();
+  if (Math.hypot(goal.x, goal.z) < 0.8 && goal.y < homeCentre.y) goal.y = homeCentre.y;
   const v = goal.vsub(body.position).scale(1 / Math.max(dt, 0.03));
-  const sp = v.length(), max = 1.4;
-  body.velocity.copy(sp > max ? v.scale(max / sp) : v);
-  body.angularVelocity.set(0, 0, 0);
+  const sp = v.length();
+  body.velocity.copy(sp > 1.4 ? v.scale(1.4 / sp) : v);
+  body.angularVelocity.scale(0.3, body.angularVelocity);
 }
 
+/** Grab / release. Released blocks are ordinary solid dynamic blocks again. */
 export function holdBlock(body: CANNON.Body, on: boolean): void {
   body.type = on ? CANNON.Body.KINEMATIC : CANNON.Body.DYNAMIC;
+  body.collisionResponse = !on;
+  body.material = on ? HELD_MAT : BLOCK_MAT;
   body.velocity.set(0, 0, 0);
   body.angularVelocity.set(0, 0, 0);
   body.wakeUp();
