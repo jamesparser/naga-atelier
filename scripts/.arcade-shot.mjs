@@ -13,8 +13,8 @@ for (const m of modes) {
   await p.waitForTimeout(600);
   await p.evaluate(() => document.querySelector('#howto')?.classList.remove('show'));
   // nudge each game into action
-  if (m === 'fappy' || m === 'penguin') for (let i = 0; i < 6; i++) { await p.keyboard.press('Space'); await p.waitForTimeout(350); }
-  if (m === 'galago' || m === 'breakout') { await p.keyboard.down('Space'); await p.waitForTimeout(1200); await p.keyboard.up('Space'); }
+  if (m === 'flapbro' || m === 'penguin') for (let i = 0; i < 6; i++) { await p.keyboard.press('Space'); await p.waitForTimeout(350); }
+  if (m === 'swarm' || m === 'breakout') { await p.keyboard.down('Space'); await p.waitForTimeout(1200); await p.keyboard.up('Space'); }
   if (m === 'maze') { await p.keyboard.down('ArrowRight'); await p.waitForTimeout(900); await p.keyboard.up('ArrowRight'); }
   if (m === 'tower') { await p.keyboard.press('Space'); await p.waitForTimeout(500); await p.keyboard.press('Space'); }
   await p.waitForTimeout(1500);

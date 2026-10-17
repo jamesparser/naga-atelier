@@ -5,20 +5,26 @@
  */
 import {
   AdditiveBlending,
+  BufferAttribute,
+  BufferGeometry,
   CanvasTexture,
   CatmullRomCurve3,
-  ConeGeometry,
   Group,
   IcosahedronGeometry,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
   PlaneGeometry,
+  Points,
+  PointsMaterial,
+  RepeatWrapping,
   SRGBColorSpace,
   SphereGeometry,
+  TorusGeometry,
   TubeGeometry,
   Vector3,
 } from 'three';
+import { dotTexture } from '../fx/sparkles.js';
 
 export type NagaMood = 'idle' | 'listening' | 'thinking' | 'speaking' | 'casting' | 'happy' | 'resting';
 
@@ -32,14 +38,66 @@ const MOOD_COLOR: Record<NagaMood, number> = {
   resting: 0x6b7a88,
 };
 
+const MOTES = 28;
+
+/** A tube whose radius tapers smoothly to nothing at both ends (no cone tips). */
+function taperedTube(curve: CatmullRomCurve3, segs: number, radius: number, radial = 10): TubeGeometry {
+  const g = new TubeGeometry(curve, segs, radius, radial, false);
+  const pos = g.attributes.position as BufferAttribute;
+  const c = new Vector3(), v = new Vector3();
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    // thick in the middle, fine at both ends, with a gentle swell like a serpent's body
+    const k = Math.pow(Math.sin(Math.PI * t), 0.6) * (0.85 + 0.15 * Math.sin(t * 14));
+    curve.getPointAt(t, c);
+    for (let j = 0; j <= radial; j++) {
+      const idx = i * (radial + 1) + j;
+      v.fromBufferAttribute(pos, idx).sub(c).multiplyScalar(k).add(c);
+      pos.setXYZ(idx, v.x, v.y, v.z);
+    }
+  }
+  pos.needsUpdate = true;
+  g.computeVertexNormals();
+  return g;
+}
+
+/** A soft pulse of light that travels along the coil (scrolled via texture offset). */
+function flowTexture(): CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 4;
+  const g = c.getContext('2d')!;
+  const grad = g.createLinearGradient(0, 0, 256, 0);
+  grad.addColorStop(0, '#202020');
+  grad.addColorStop(0.42, '#303030');
+  grad.addColorStop(0.5, '#ffffff');
+  grad.addColorStop(0.58, '#303030');
+  grad.addColorStop(1, '#202020');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 4);
+  const t = new CanvasTexture(c);
+  t.wrapS = RepeatWrapping;
+  t.repeat.set(2, 1);
+  return t;
+}
+
 export class Naga {
   readonly root = new Group();
   readonly caption: Caption;
-  private core: Mesh;
-  private coreMat: MeshStandardMaterial;
+  private heart: Mesh;
+  private heartMat: MeshStandardMaterial;
+  private shell: Mesh;
+  private shellMat: MeshStandardMaterial;
   private halo: Mesh;
   private haloMat: MeshBasicMaterial;
+  private ring: Mesh;
+  private ringMat: MeshBasicMaterial;
   private coil = new Group();
+  private coilMat: MeshStandardMaterial;
+  private flow: CanvasTexture;
+  private motes: Points;
+  private moteMat: PointsMaterial;
+  private motePos = new Float32Array(MOTES * 3);
   private mood: NagaMood = 'idle';
   private moodUntil = 0;
   private pop = 0;
@@ -48,29 +106,41 @@ export class Naga {
 
   constructor() {
     this.root.position.copy(this.home);
-    this.coreMat = new MeshStandardMaterial({ color: 0x0d3b3a, emissive: MOOD_COLOR.idle, emissiveIntensity: 0.9, roughness: 0.3 });
-    this.core = new Mesh(new IcosahedronGeometry(0.032, 3), this.coreMat);
-    this.haloMat = new MeshBasicMaterial({ color: MOOD_COLOR.idle, transparent: true, opacity: 0.18, blending: AdditiveBlending, depthWrite: false });
+    // faceted glowing heart inside a smoky glass shell
+    this.heartMat = new MeshStandardMaterial({ color: 0x0a2a28, emissive: MOOD_COLOR.idle, emissiveIntensity: 1.3, roughness: 0.25, metalness: 0.3, flatShading: true });
+    this.heart = new Mesh(new IcosahedronGeometry(0.017, 0), this.heartMat);
+    this.shellMat = new MeshStandardMaterial({ color: 0x163a44, emissive: MOOD_COLOR.idle, emissiveIntensity: 0.18, roughness: 0.08, metalness: 0.6, transparent: true, opacity: 0.42, depthWrite: false });
+    this.shell = new Mesh(new SphereGeometry(0.031, 32, 20), this.shellMat);
+    this.haloMat = new MeshBasicMaterial({ color: MOOD_COLOR.idle, transparent: true, opacity: 0.16, blending: AdditiveBlending, depthWrite: false });
     this.halo = new Mesh(new SphereGeometry(0.05, 24, 16), this.haloMat);
-    this.root.add(this.core, this.halo, this.coil);
+    // a thin orbit ring that tilts toward you when listening
+    this.ringMat = new MeshBasicMaterial({ color: MOOD_COLOR.idle, transparent: true, opacity: 0.7, blending: AdditiveBlending, depthWrite: false });
+    this.ring = new Mesh(new TorusGeometry(0.041, 0.0011, 6, 64), this.ringMat);
+    this.ring.rotation.x = Math.PI / 2;
+    this.root.add(this.halo, this.shell, this.heart, this.ring, this.coil);
 
-    // Serpent body: a tapered helix wrapped around the orb, with a little head.
+    // Serpent body: a tapered helix of light wrapped around the orb (both ends fade to a point).
     const pts: Vector3[] = [];
-    const turns = 1.6;
-    for (let i = 0; i <= 64; i++) {
-      const t = i / 64;
+    const turns = 1.75;
+    for (let i = 0; i <= 80; i++) {
+      const t = i / 80;
       const a = t * Math.PI * 2 * turns;
-      const r = 0.05 + 0.006 * Math.sin(t * 9);
-      pts.push(new Vector3(Math.cos(a) * r, -0.035 + t * 0.07, Math.sin(a) * r));
+      const r = 0.049 + 0.005 * Math.sin(t * 9);
+      pts.push(new Vector3(Math.cos(a) * r, -0.038 + t * 0.076 + 0.004 * Math.sin(t * 20), Math.sin(a) * r));
     }
     const curve = new CatmullRomCurve3(pts);
-    const bodyMat = new MeshStandardMaterial({ color: 0x1f8f7f, emissive: 0x0b3d36, roughness: 0.45, metalness: 0.2 });
-    const body = new Mesh(new TubeGeometry(curve, 96, 0.0065, 8, false), bodyMat);
-    const head = new Mesh(new ConeGeometry(0.011, 0.024, 10), new MeshStandardMaterial({ color: 0xffd166, emissive: 0x5a4210, roughness: 0.4 }));
-    const end = curve.getPoint(1), tan = curve.getTangent(1);
-    head.position.copy(end);
-    head.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), tan);
-    this.coil.add(body, head);
+    this.flow = flowTexture();
+    this.coilMat = new MeshStandardMaterial({ color: 0x0f5a52, emissive: MOOD_COLOR.idle, emissiveMap: this.flow, emissiveIntensity: 1.4, roughness: 0.35, metalness: 0.4 });
+    const body = new Mesh(taperedTube(curve, 160, 0.0068), this.coilMat);
+    this.coil.add(body);
+
+    // motes orbiting the orb
+    const mg = new BufferGeometry();
+    mg.setAttribute('position', new BufferAttribute(this.motePos, 3));
+    this.moteMat = new PointsMaterial({ size: 0.006, map: dotTexture(), color: MOOD_COLOR.idle, transparent: true, depthWrite: false, blending: AdditiveBlending });
+    this.motes = new Points(mg, this.moteMat);
+    this.motes.frustumCulled = false;
+    this.root.add(this.motes);
 
     this.caption = new Caption();
     this.caption.mesh.position.set(0, 0.29, -0.30);
@@ -95,18 +165,37 @@ export class Naga {
       this.moodUntil = 0;
       this.mood = 'idle';
     }
-    const target = MOOD_COLOR[this.mood];
-    this.coreMat.emissive.lerp(tmpColor(target), Math.min(1, dt * 8));
-    this.haloMat.color.lerp(tmpColor(target), Math.min(1, dt * 8));
+    const target = tmpColor(MOOD_COLOR[this.mood]);
+    const k = Math.min(1, dt * 8);
+    for (const c of [this.heartMat.emissive, this.shellMat.emissive, this.haloMat.color, this.ringMat.color, this.coilMat.emissive, this.moteMat.color]) c.lerp(target, k);
     const speedBy: Record<NagaMood, number> = { idle: 0.6, listening: 1.4, thinking: 3.5, speaking: 1.2, casting: 6, happy: 2, resting: 0.15 };
-    this.coil.rotation.y += dt * speedBy[this.mood];
+    const sp = speedBy[this.mood];
+    this.coil.rotation.y += dt * sp;
+    this.flow.offset.x -= dt * (0.25 + sp * 0.35); // light runs up the serpent
+    this.heart.rotation.x += dt * (0.4 + sp * 0.6);
+    this.heart.rotation.y += dt * (0.7 + sp);
+    // the ring tilts toward you while listening and spins while thinking
+    const tilt = this.mood === 'listening' ? 0.9 : this.mood === 'thinking' ? 0.35 : 0;
+    this.ring.rotation.x += (Math.PI / 2 - tilt - this.ring.rotation.x) * k;
+    this.ring.rotation.z += dt * (this.mood === 'thinking' ? 4 : 0.5);
     this.pop = Math.max(0, this.pop - dt * 2.5);
     const breathe = 1 + 0.04 * Math.sin(now / 600);
     const talk = this.mood === 'speaking' || this.mood === 'listening' ? this.level * 0.25 : 0;
     const s = breathe + talk + this.pop * 0.35;
-    this.core.scale.setScalar(s);
+    this.heart.scale.setScalar(s * (1 + talk * 0.8));
+    this.shell.scale.setScalar(breathe + this.pop * 0.2);
     this.halo.scale.setScalar(s * (1.1 + 0.15 * Math.sin(now / 300)));
-    this.haloMat.opacity = this.mood === 'resting' ? 0.06 : 0.16 + talk * 0.5 + this.pop * 0.3;
+    this.ring.scale.setScalar(1 + this.pop * 0.25 + talk * 0.2);
+    this.haloMat.opacity = this.mood === 'resting' ? 0.05 : 0.14 + talk * 0.5 + this.pop * 0.3;
+    this.coilMat.emissiveIntensity = this.mood === 'resting' ? 0.4 : 1.3 + talk * 2 + this.pop;
+    for (let i = 0; i < MOTES; i++) {
+      const a = now / 1000 * (0.6 + (i % 5) * 0.15) * (1 + sp * 0.3) + i * 2.39;
+      const r = 0.058 + (i % 3) * 0.008 + this.pop * 0.03;
+      const y = Math.sin(a * 0.7 + i) * 0.035;
+      this.motePos.set([Math.cos(a) * r, y, Math.sin(a) * r], i * 3);
+    }
+    (this.motes.geometry.attributes.position as BufferAttribute).needsUpdate = true;
+    this.moteMat.opacity = this.mood === 'resting' ? 0.2 : 0.75;
     this.root.position.y = this.home.y + 0.008 * Math.sin(now / 900);
     this.caption.update(now);
   }

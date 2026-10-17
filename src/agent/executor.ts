@@ -6,6 +6,7 @@ import type { BuildCommand } from '../../shared/protocol.js';
 import { CELL } from '../config.js';
 import type { VoxelModel } from '../blocks/voxelModel.js';
 import { blueprintFromShape, getBlueprint, planSpawn, type SpawnPlan } from '../blueprints/index.js';
+import { chartBlueprint, deleteChanges, duplicateChanges, floorplanBlueprint, mirrorChanges, replaceColorChanges, textBlueprint } from './tools.js';
 
 export interface ExecResult {
   ok: boolean;
@@ -23,6 +24,7 @@ export function executeCommand(model: VoxelModel, cmd: BuildCommand): ExecResult
       if (!bp) return { ok: false, speech: "I don't know that shape yet." };
       const plan = planSpawn(model, bp, { anchor: cmd.anchor, color: cmd.color, scale: cmd.scale });
       if (plan.changes.length === 0) return { ok: false, speech: 'The desk is too full — clear some space?' };
+      model.labels.set(plan.spawnId, bp.id);
       model.commit(`build ${bp.id}`, plan.changes, plan.spawnId);
       return { ok: true, spawn: plan, keys: plan.order };
     }
@@ -31,6 +33,7 @@ export function executeCommand(model: VoxelModel, cmd: BuildCommand): ExecResult
       const bp = blueprintFromShape(cmd.shape);
       const plan = planSpawn(model, bp, { anchor: cmd.anchor, color: cmd.color, scale: cmd.scale });
       if (plan.changes.length === 0) return { ok: false, speech: 'The desk is too full — clear some space?' };
+      model.labels.set(plan.spawnId, bp.label.toLowerCase().replace(/[^a-z]+/g, '_'));
       model.commit(`sculpt ${bp.label}`, plan.changes, plan.spawnId);
       return { ok: true, spawn: plan, keys: plan.order };
     }
@@ -85,6 +88,54 @@ export function executeCommand(model: VoxelModel, cmd: BuildCommand): ExecResult
     }
     case 'game':
       return { ok: false, speech: 'Game commands are handled by the game mode.' };
+    case 'info':
+    case 'save':
+    case 'load':
+      return { ok: false, speech: 'That is answered by the app.' };
+    case 'duplicate': {
+      const keys = model.resolveTarget(cmd.target);
+      if (!keys.length) return { ok: false, speech: 'There is nothing to copy yet.' };
+      const n = cmd.count ?? 1;
+      const d = duplicateChanges(model, keys, n);
+      if (!d.placed) return { ok: false, speech: 'No room for a copy — clear some space?' };
+      const srcLabel = model.labels.get(model.cells.get(keys[0])?.cl?.split(':')[0] ?? '');
+      if (srcLabel) for (const sid of d.spawnIds) model.labels.set(sid, srcLabel);
+      model.commit(`duplicate ×${d.placed}`, d.changes, d.spawnIds[d.spawnIds.length - 1]);
+      const ks = d.changes.map((c) => c.key);
+      return { ok: true, keys: ks, spawn: { spawnId: d.spawnIds[0], changes: d.changes, order: ks, clipped: d.placed < n }, speech: d.placed < n ? `Only room for ${d.placed}.` : undefined };
+    }
+    case 'delete': {
+      const keys = model.resolveTarget(cmd.target);
+      if (!keys.length) return { ok: false, speech: 'There is nothing to remove.' };
+      model.commit(`delete ${cmd.target ?? 'last'}`, deleteChanges(model, keys));
+      return { ok: true };
+    }
+    case 'mirror': {
+      const keys = model.resolveTarget(cmd.target);
+      if (!keys.length) return { ok: false, speech: 'There is nothing to mirror yet.' };
+      model.commit('mirror', mirrorChanges(model, keys));
+      return { ok: true, keys };
+    }
+    case 'replace': {
+      const keys = model.resolveTarget(cmd.target ?? 'all');
+      const ch = cmd.fromColor && cmd.color ? replaceColorChanges(model, keys, cmd.fromColor, cmd.color) : [];
+      if (!ch.length) return { ok: false, speech: `I don't see any ${cmd.fromColor?.replace('roof_red', 'red') ?? 'of that colour'} blocks.` };
+      model.commit('swap colour', ch);
+      return { ok: true, keys: ch.map((c) => c.key) };
+    }
+    case 'text':
+    case 'chart':
+    case 'floorplan': {
+      const bp =
+        cmd.type === 'text' ? textBlueprint(cmd.text ?? 'HI', cmd.color ?? 'gold')
+        : cmd.type === 'chart' ? chartBlueprint(cmd.values ?? [1], cmd.color).bp
+        : floorplanBlueprint(cmd.rooms ?? 4);
+      const plan = planSpawn(model, bp, { anchor: cmd.anchor });
+      if (plan.changes.length === 0) return { ok: false, speech: 'The desk is too full — clear some space?' };
+      model.labels.set(plan.spawnId, cmd.type === 'text' ? 'sign' : cmd.type === 'chart' ? 'chart' : 'floor_plan');
+      model.commit(`${cmd.type}`, plan.changes, plan.spawnId);
+      return { ok: true, spawn: plan, keys: plan.order, speech: plan.clipped ? 'It only partly fits — try a bigger grid?' : undefined };
+    }
     case 'rotate': {
       const keys = model.resolveTarget(cmd.target);
       if (!keys.length) return { ok: false, speech: 'There is nothing to rotate yet.' };

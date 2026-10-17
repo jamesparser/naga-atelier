@@ -56,6 +56,8 @@ export class VoxelModel {
   private spawnCounter = 0;
   /** Spawn id of the most recent agent/blueprint structure ("s3"), or a loose key group. */
   lastSpawn: string | null = null;
+  /** what each spawned object is ("s3" -> "house_small"), so voice can target whole objects */
+  readonly labels = new Map<string, string>();
 
   on(fn: (e: ModelEvent) => void): () => void {
     this.listeners.add(fn);
@@ -187,6 +189,12 @@ export class VoxelModel {
       return this.newestSpawnKeys();
     }
     const names = new Set([t, t.replace(/s$/, ''), `${t}s`]);
+    // a whole object by what it is ("the house", "the car"): newest spawn with that label
+    const byLabel = [...this.labels].filter(([sid, l]) => (names.has(l) || names.has(l.split('_')[0])) && this.keysInSpawn(sid).length);
+    if (byLabel.length) {
+      const sid = byLabel.sort((a, b) => Number(b[0].slice(1)) - Number(a[0].slice(1)))[0][0];
+      return this.keysInSpawn(sid);
+    }
     // Match the leaf name first ("roof" excludes "roof/chimney"); fall back to whole groups.
     const leafOf = (cl: string) => cl.slice(cl.indexOf(':') + 1).split('/').pop()!;
     const groupName = (cl: string) => cl.slice(cl.indexOf(':') + 1).split('/')[0];
@@ -307,8 +315,8 @@ export class VoxelModel {
 
   // --------------------------------------------------------- persistence
 
-  toJSON(): { v: 1; cells: Array<[string, Cell]>; spawnCounter: number; lastSpawn: string | null } {
-    return { v: 1, cells: [...this.cells], spawnCounter: this.spawnCounter, lastSpawn: this.lastSpawn };
+  toJSON(): { v: 1; cells: Array<[string, Cell]>; spawnCounter: number; lastSpawn: string | null; labels?: Array<[string, string]> } {
+    return { v: 1, cells: [...this.cells], spawnCounter: this.spawnCounter, lastSpawn: this.lastSpawn, labels: [...this.labels] };
   }
 
   load(data: unknown): boolean {
@@ -325,6 +333,9 @@ export class VoxelModel {
     }
     this.spawnCounter = typeof d.spawnCounter === 'number' ? d.spawnCounter : 0;
     this.lastSpawn = typeof d.lastSpawn === 'string' ? d.lastSpawn : null;
+    this.labels.clear();
+    const labels = (d as { labels?: unknown }).labels;
+    if (Array.isArray(labels)) for (const e of labels) if (Array.isArray(e) && typeof e[0] === 'string' && typeof e[1] === 'string') this.labels.set(e[0], e[1]);
     this.undoStack.length = 0;
     this.redoStack.length = 0;
     this.version++;

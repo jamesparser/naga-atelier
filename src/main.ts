@@ -20,7 +20,7 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { DEBUG, DESK_BELOW_HEAD, DESK_FORWARD, LOW_FX, QUERY, CELL, GRID_PRESETS, GRID_PRESET_ID, applyGridPreset, nextGridPreset } from './config.js';
-import { sanitizeCommand, BLUEPRINT_IDS, type AgentEnvelope, type BuildCommand, type BlueprintId } from '../shared/protocol.js';
+import { sanitizeCommand, BLUEPRINT_IDS, type AgentEnvelope, type BuildCommand, type BlueprintId, type PaletteName } from '../shared/protocol.js';
 import { VoxelModel, key } from './blocks/voxelModel.js';
 import { VoxelRenderer } from './blocks/voxelRenderer.js';
 import { buildDesk } from './scene/desk.js';
@@ -33,6 +33,7 @@ import { AgentClient } from './agent/client.js';
 import { VoiceInput } from './agent/voice.js';
 import { Speaker } from './agent/tts.js';
 import { executeCommand } from './agent/executor.js';
+import { countBlocks, describeDesk, measure, sceneSummary } from './agent/tools.js';
 import { BLUEPRINTS } from './blueprints/index.js';
 import { Onboarding } from './onboarding.js';
 import { downloadWorld } from './export/worldExport.js';
@@ -43,12 +44,12 @@ import { MODE_LAYOUT } from './ui/dock.js';
 import { ARCADE_PAD, ScreenPad, SLING_PAD, TETRIS_PAD } from './ui/screenPad.js';
 import { ARCADE_GAMES, ArcadePicker, type ArcadeId } from './game/arcade.js';
 import type { GameBase } from './game/gameBase.js';
-import { Galago } from './game/galago.js';
+import { StarSwarm } from './game/starSwarm.js';
 import { MarbleMaze } from './game/marbleMaze.js';
 import { WhackAGloom } from './game/whack.js';
 import { Breakout3D } from './game/breakout.js';
 import { BlockTower } from './game/blockTower.js';
-import { FappyBro } from './game/fappyBro.js';
+import { FlapBro } from './game/flapBro.js';
 import { MikePenguin } from './game/mikePenguin.js';
 import { DESK_HALF_W, DESK_HALF_D } from './scene/desk.js';
 
@@ -165,7 +166,60 @@ function start(): void {
   let starterKey: string | null = null;
 
   /** Apply one command now (caller guarantees hands are not mid-carry). */
-  const apply = (cmd: BuildCommand): { ok: boolean; speech?: string } => {
+  // named layouts ("save this as kitchen", "load kitchen") live on this device
+  const SAVES_KEY = 'naga-atelier:saves:v1';
+  const readSaves = (): Record<string, ReturnType<VoxelModel['toJSON']>> => {
+    try {
+      return JSON.parse(localStorage.getItem(SAVES_KEY) ?? '{}') ?? {};
+    } catch {
+      return {};
+    }
+  };
+  const apply = (cmd: BuildCommand): { ok: boolean; speech?: string; answer?: boolean } => {
+    if (cmd.type === 'info') {
+      const target = cmd.target && cmd.target !== 'all' ? model.resolveTarget(cmd.target) : null;
+      const names = Object.keys(readSaves());
+      const answer =
+        cmd.question === 'count' ? countBlocks(model, target)
+        : cmd.question === 'size' ? measure(target ?? model.resolveTarget('last'))
+        : cmd.question === 'saves' ? (names.length ? `Saved layouts: ${names.join(', ')}.` : 'No saved layouts yet. Say “save this as …”.')
+        : describeDesk(model);
+      sfx.play('chime');
+      if (target) voxels.pulse(target, performance.now());
+      return { ok: true, speech: answer, answer: true };
+    }
+    if (cmd.type === 'save') {
+      if (!model.size) return { ok: false, speech: 'The desk is empty — build something first.' };
+      const saves = readSaves();
+      saves[cmd.name!] = model.toJSON();
+      try {
+        localStorage.setItem(SAVES_KEY, JSON.stringify(saves));
+      } catch {
+        return { ok: false, speech: "I couldn't save on this device." };
+      }
+      sfx.play('chime');
+      return { ok: true, speech: `Saved as “${cmd.name}”. Say “load ${cmd.name}” any time.`, answer: true };
+    }
+    if (cmd.type === 'load') {
+      const saved = readSaves()[cmd.name!];
+      if (!saved) {
+        const names = Object.keys(readSaves());
+        return { ok: false, speech: names.length ? `I don't have “${cmd.name}”. I have: ${names.join(', ')}.` : 'No saved layouts yet.' };
+      }
+      // one undoable change; old spawn ids are renumbered so they never clash with new builds
+      const remap = new Map<string, string>();
+      const assign: Array<[string, { c: PaletteName; cl: string | null } | null]> = [...model.cells.keys()].map((k) => [k, null]);
+      for (const [k, c] of saved.cells) {
+        const sid = c.cl ? c.cl.split(':')[0] : null;
+        if (sid && !remap.has(sid)) remap.set(sid, model.nextSpawnId());
+        assign.push([k, { c: c.c, cl: c.cl && sid ? `${remap.get(sid)}:${c.cl.slice(sid.length + 1)}` : null }]);
+      }
+      for (const [sid, l] of saved.labels ?? []) if (remap.has(sid)) model.labels.set(remap.get(sid)!, l);
+      model.commit(`load ${cmd.name}`, model.diff(assign), [...remap.values()].pop() ?? null);
+      voxels.animateSpawn(saved.cells.map(([k]) => k), performance.now());
+      sfx.play('cast');
+      return { ok: true, speech: `Loaded “${cmd.name}”. Say undo to go back.`, answer: true };
+    }
     if (cmd.type === 'export') {
       downloadWorld(model);
       sfx.play('chime');
@@ -235,7 +289,8 @@ function start(): void {
         pending.push(env.build); // hands win: apply after the drop
       } else {
         const res = apply(env.build);
-        if (!res.ok && res.speech) speech = res.speech;
+        if (res.speech && (!res.ok || res.answer)) speech = res.speech;
+        else if (res.speech) speech = `${speech} ${res.speech}`;
       }
     }
     say(speech, speech === env.speech ? env.audio : null);
@@ -247,7 +302,7 @@ function start(): void {
     naga.setMood('thinking');
     dock.setMicState('thinking');
     naga.caption.say('…', 4000);
-    const env = await agent.sendText(text);
+    const env = await agent.sendText(text, sceneSummary(model));
     dock.setMicState('idle');
     handleEnvelope(env);
   };
@@ -272,7 +327,7 @@ function start(): void {
       dock.setMicState('thinking');
       naga.caption.say('…');
       try {
-        handleEnvelope(await agent.sendAudio(r.blob));
+        handleEnvelope(await agent.sendAudio(r.blob, sceneSummary(model)));
       } catch (e) {
         say((e as Error).message === 'stt_unavailable' ? "I can't hear in this browser yet — tap the star instead." : "Agent busy — sculpt with your hands, I'll be right back.");
         naga.setMood('resting', 3000);
@@ -325,7 +380,7 @@ function start(): void {
       case 'sling': setMode('sling'); break;
       case 'build': setMode('build'); break;
       case 'arcade': setMode('arcade'); break;
-      case 'galago': case 'maze': case 'whack': case 'breakout': case 'tower': case 'fappy': case 'penguin': setMode(action); break;
+      case 'swarm': case 'maze': case 'whack': case 'breakout': case 'tower': case 'flapbro': case 'penguin': setMode(action); break;
       case 'recenter':
         sfx.play('click');
         placeDeskNextFrame = true;
@@ -369,13 +424,13 @@ function start(): void {
     let g = arcadeGames.get(m);
     if (!g) {
       switch (m as ArcadeId | 'arcade') {
-        case 'arcade': g = new ArcadePicker(deskRoot, gameHost, (id) => setMode(id)); break;
-        case 'galago': g = new Galago(deskRoot, gameHost); break;
+        case 'arcade': g = new ArcadePicker(deskRoot, gameHost, (id) => setMode(id as Mode)); break;
+        case 'swarm': g = new StarSwarm(deskRoot, gameHost); break;
         case 'maze': g = new MarbleMaze(deskRoot, gameHost); break;
         case 'whack': g = new WhackAGloom(deskRoot, gameHost); break;
         case 'breakout': g = new Breakout3D(deskRoot, gameHost); break;
         case 'tower': g = new BlockTower(deskRoot, gameHost); break;
-        case 'fappy': g = new FappyBro(deskRoot, gameHost); break;
+        case 'flapbro': g = new FlapBro(deskRoot, gameHost); break;
         case 'penguin': g = new MikePenguin(deskRoot, gameHost); break;
       }
       arcadeGames.set(m, g!);
@@ -386,7 +441,7 @@ function start(): void {
   const tetris = new TetrisMode(deskRoot, shadows, gameHost);
   const sling = new SlingMode(deskRoot, shadows, gameHost);
   // Mode switcher on the left edge of the desk: build · tetris · sling, always reachable.
-  const modeBar = new Dock(MODE_LAYOUT, { x: -DESK_HALF_W - 0.045, zFront: DESK_HALF_D + 0.03, labels: { build: 'BUILD', game: 'TETRIS', sling: 'ANGRY SLING', arcade: 'ARCADE' } });
+  const modeBar = new Dock(MODE_LAYOUT, { x: -DESK_HALF_W - 0.045, zFront: DESK_HALF_D + 0.03, labels: { build: 'BUILD', arcade: 'ARCADE' } });
   modeBar.setSelected('build');
   deskRoot.add(modeBar.root);
   const modeBarPinch = new Map<number, boolean>();
@@ -412,7 +467,7 @@ function start(): void {
     if (next === mode) return;
     const prev = mode;
     mode = next;
-    modeBar.setSelected(next === 'build' || next === 'game' || next === 'sling' ? next : 'arcade');
+    modeBar.setSelected(next === 'build' ? 'build' : 'arcade');
     if (prev === 'build') {
       interaction.cancelAll();
       onboarding.active = false;
@@ -841,6 +896,9 @@ function start(): void {
     deskToWorld: (x: number, y: number, z: number) => deskRoot.localToWorld(new Vector3((x + 0.5) * CELL, (y + 0.5) * CELL, (z + 0.5) * CELL)).toArray(),
     pointers: () => hands.pointers.map((p) => ({ id: p.id, kind: p.kind, active: p.active, pinching: p.pinching, pinch: p.pinchPoint.toArray(), tip: p.indexTip?.toArray() ?? null })),
     caption: () => naga.caption,
+    naga,
+    camera,
+    orbit,
     interaction,
     tetris,
     sling,

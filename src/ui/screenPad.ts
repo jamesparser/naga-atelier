@@ -196,8 +196,8 @@ const HELP = { id: 'help', label: 'How to play', key: '?', tip: 'Show all contro
 const PAUSE = { id: 'pause', label: 'Pause', key: 'P', tip: 'Pause / resume (P)' };
 const NEW = { id: 'start', label: 'New game', key: 'N', tip: 'Start over (N)' };
 
-export const GALAGO_PAD: PadLayout = {
-  title: 'Galago',
+export const SWARM_PAD: PadLayout = {
+  title: 'Star Swarm',
   hint: 'Blast the alien swarm before it dives into you. Clear a wave to warp to the next.',
   rows: [
     [
@@ -319,26 +319,28 @@ export const ARCADE_PAD: PadLayout = {
   hint: 'Pick a game. Each one works with hands, controllers, mouse, touch and keyboard.',
   rows: [
     [
-      { id: 'galago', label: 'Galago', key: '1', tip: 'Space shooter (1)' },
-      { id: 'maze', label: 'Marble Maze', key: '2', tip: 'Tilt the board (2)' },
-      { id: 'whack', label: 'Whack-a-Gloom', key: '3', tip: 'Bop the gloomlings (3)' },
-      { id: 'breakout', label: 'Breakout 3D', key: '4', tip: '3D brick breaker (4)' },
+      { id: 'game', label: 'Tetris', key: '1', tip: 'Neon 3D Tetris (1)' },
+      { id: 'sling', label: 'Angry Sling', key: '2', tip: 'Physics slingshot (2)' },
+      { id: 'swarm', label: 'Star Swarm', key: '3', tip: 'Space shooter (3)' },
+      { id: 'maze', label: 'Marble Maze', key: '4', tip: 'Tilt the board (4)' },
+      { id: 'whack', label: 'Whack-a-Gloom', key: '5', tip: 'Bop the gloomlings (5)' },
     ],
     [
-      { id: 'tower', label: 'Block Tower', key: '5', tip: 'Pull blocks, stack on top (5)' },
-      { id: 'fappy', label: 'Fappy Bro', key: '6', tip: 'First-person flapper (6)' },
-      { id: 'penguin', label: 'Mike Penguin', key: '7', tip: 'First-person ice run (7)' },
+      { id: 'breakout', label: 'Breakout 3D', key: '6', tip: '3D brick breaker (6)' },
+      { id: 'tower', label: 'Block Tower', key: '7', tip: 'Pull blocks, stack on top (7)' },
+      { id: 'flapbro', label: 'Flap Bro', key: '8', tip: 'First-person flapper (8)' },
+      { id: 'penguin', label: 'Mike Penguin', key: '9', tip: 'First-person ice run (9)' },
     ],
   ],
   extras: [HELP, BACK],
   help: [
-    { head: 'Pick a game', lines: ['Click a button, press 1–7, or say “play galago”, “marble maze”, “mike penguin”…', 'Esc (or Back to build) returns to your desk, untouched'] },
+    { head: 'Pick a game', lines: ['Click a button, press 1–9, or say “play tetris”, “star swarm”, “mike penguin”…', 'Esc (or Back to build) returns to your desk, untouched'] },
     { head: 'Quest', lines: ['Poke or pinch a tile on the desk', 'The column on the left edge of the desk switches modes any time'] },
   ],
 };
 
-export const FAPPY_PAD: PadLayout = {
-  title: 'Fappy Bro',
+export const FLAPBRO_PAD: PadLayout = {
+  title: 'Flap Bro',
   hint: 'You are the bird. Flap to rise, fall between flaps, and fly through the gaps.',
   rows: [[{ id: 'flap', label: 'Flap', key: 'Space', tip: 'Flap (Space, click, tap)', wide: true }]],
   extras: [NEW, PAUSE, HELP, BACK],

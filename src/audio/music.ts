@@ -37,8 +37,8 @@ export const STYLES = {
     bass: { type: 'triangle', gain: 0.38, cutoff: 1400, hit: (s) => s % 4 === 0 || s % 16 === 10 },
     lead: { type: 'triangle', gain: 0.1, cutoff: 4000, hit: (s) => s % 4 === 0 || s % 4 === 3, octave: 24, walk: 2 },
     kick: (s) => s % 8 === 0, snare: (s) => s % 8 === 4, hat: (s) => s % 4 === 2 },
-  // Galago: fast space-arcade pulses
-  galago: { bpm: 148, maxBpm: 184, scale: DORIAN, prog: [0, 0, -2, -4], root: 40,
+  // Star Swarm: fast space-arcade pulses
+  swarm: { bpm: 148, maxBpm: 184, scale: DORIAN, prog: [0, 0, -2, -4], root: 40,
     bass: { type: 'square', gain: 0.22, cutoff: 1200, hit: () => true },
     lead: { type: 'sawtooth', gain: 0.05, cutoff: 3200, hit: (s) => s % 3 === 0, octave: 24 },
     kick: (s) => s % 4 === 0, snare: (s) => s % 8 === 4, hat: (s) => s % 2 === 1 },
@@ -62,8 +62,8 @@ export const STYLES = {
     bass: { type: 'sine', gain: 0.36, cutoff: 700, hit: (s) => s % 4 === 0, bounce: false },
     lead: { type: 'triangle', gain: 0.05, cutoff: 2200, hit: (s) => s % 8 === 6, octave: 24, walk: 1 },
     pad: { type: 'sine', gain: 0.025 }, hat: (s) => s % 2 === 0, volume: 0.12 },
-  // Fappy Bro: sunny chip pop
-  fappy: { bpm: 120, scale: MAJOR_PENTA, prog: [0, 5, 9, 7], root: 50,
+  // Flap Bro: sunny chip pop
+  flapbro: { bpm: 120, scale: MAJOR_PENTA, prog: [0, 5, 9, 7], root: 50,
     bass: { type: 'triangle', gain: 0.34, cutoff: 1600, hit: (s) => s % 4 === 0 || s % 4 === 3 },
     lead: { type: 'square', gain: 0.07, cutoff: 4500, hit: (s) => s % 2 === 0, octave: 24, walk: 2 },
     kick: (s) => s % 8 === 0, snare: (s) => s % 8 === 4, hat: (s) => s % 2 === 1 },

@@ -69,9 +69,22 @@ export const COMMAND_TYPES = [
   'export',
   'grid',
   'game',
+  // productivity tools
+  'duplicate',
+  'delete',
+  'mirror',
+  'replace',
+  'text',
+  'chart',
+  'floorplan',
+  'info',
+  'save',
+  'load',
 ] as const;
+export const INFO_QUESTIONS = ['count', 'describe', 'size', 'saves'] as const;
+export type InfoQuestion = (typeof INFO_QUESTIONS)[number];
 export const GAME_ACTIONS = ['start', 'stop', 'pause', 'drop', 'retry', 'next'] as const;
-export const GAME_MODES = ['tetris', 'sling', 'arcade', 'galago', 'maze', 'whack', 'breakout', 'tower', 'fappy', 'penguin'] as const;
+export const GAME_MODES = ['tetris', 'sling', 'arcade', 'swarm', 'maze', 'whack', 'breakout', 'tower', 'flapbro', 'penguin'] as const;
 export type GameMode = (typeof GAME_MODES)[number];
 export type GameAction = (typeof GAME_ACTIONS)[number];
 export type CommandType = (typeof COMMAND_TYPES)[number];
@@ -103,6 +116,21 @@ export interface BuildCommand {
   game?: GameMode;
   /** rotate: quarter turns clockwise seen from above (default 1) */
   turns?: number;
+  /** duplicate: how many copies (1–6), laid out in a row */
+  count?: number;
+  /** text: what to write in blocks (A–Z, 0–9, space, ! ? - .) */
+  text?: string;
+  /** chart: bar values (1–10 numbers); labels are spoken, not built */
+  values?: number[];
+  labels?: string[];
+  /** floorplan: number of rooms (2–6) */
+  rooms?: number;
+  /** replace: the colour to swap out (color = the new colour) */
+  fromColor?: PaletteName;
+  /** info: what to answer */
+  question?: InfoQuestion;
+  /** save / load: layout name */
+  name?: string;
   /** grid: which block-size preset to switch to */
   preset?: GridPresetId;
   message?: string;
@@ -218,6 +246,33 @@ export function sanitizeCommand(raw: unknown): BuildCommand | null {
     if (typeof raw.action !== 'string' || !(GAME_ACTIONS as readonly string[]).includes(raw.action)) return null;
     cmd.action = raw.action as GameAction;
     if (typeof raw.game === 'string' && (GAME_MODES as readonly string[]).includes(raw.game)) cmd.game = raw.game as GameMode;
+  }
+  // --- productivity tools ---------------------------------------------------------
+  if (typeof raw.count === 'number' && Number.isFinite(raw.count)) cmd.count = clamp(Math.round(raw.count), 1, 6);
+  if (typeof raw.text === 'string') {
+    const t = raw.text.toUpperCase().replace(/[^A-Z0-9 !?.\-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    if (t) cmd.text = t;
+  }
+  if (type === 'text' && !cmd.text) return null;
+  if (Array.isArray(raw.values)) {
+    const v = raw.values.map(Number).filter((n) => Number.isFinite(n) && n >= 0).slice(0, 10);
+    if (v.length) cmd.values = v;
+  }
+  if (type === 'chart' && !cmd.values) return null;
+  if (Array.isArray(raw.labels)) cmd.labels = raw.labels.filter((l): l is string => typeof l === 'string').map((l) => l.slice(0, 16)).slice(0, 10);
+  if (typeof raw.rooms === 'number' && Number.isFinite(raw.rooms)) cmd.rooms = clamp(Math.round(raw.rooms), 2, 6);
+  if (typeof raw.fromColor === 'string' && (PALETTE_NAMES as readonly string[]).includes(raw.fromColor)) cmd.fromColor = raw.fromColor as PaletteName;
+  if (type === 'replace' && (!cmd.color || !cmd.fromColor)) return null;
+  if (typeof raw.question === 'string' && (INFO_QUESTIONS as readonly string[]).includes(raw.question)) cmd.question = raw.question as InfoQuestion;
+  if (type === 'info' && !cmd.question) cmd.question = 'describe';
+  if (typeof raw.name === 'string') {
+    const n = raw.name.toLowerCase().replace(/[^a-z0-9 _-]/g, '').trim().slice(0, 20);
+    if (n) cmd.name = n;
+  }
+  if ((type === 'save' || type === 'load') && !cmd.name) cmd.name = 'my desk';
+  if (type === 'text' || type === 'chart' || type === 'floorplan') {
+    const anchor = raw.anchor;
+    cmd.anchor = typeof anchor === 'string' && (ANCHORS as readonly string[]).includes(anchor) ? (anchor as Anchor) : 'desk_center';
   }
   if (typeof raw.message === 'string') cmd.message = raw.message.slice(0, 160);
   if (typeof raw.ts === 'number') cmd.ts = raw.ts;

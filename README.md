@@ -2,7 +2,7 @@
 
 **Talk it into the room. Sculpt it with your hands.**
 
-AgentAsia Voxel is a seated mixed-reality block studio for Meta Quest 3. It runs in the browser (WebXR, nothing to install). Talk to **Naga**, the coiled-serpent companion, and your hands do the rest.
+AgentAsia Voxel is a seated mixed-reality block studio for Meta Quest 3. It runs in the browser (WebXR, nothing to install). Talk to **Naga**, a glass orb wrapped in a coiled serpent of light, and your hands do the rest.
 You say what you want and Naga, a small coiled-serpent companion, drafts it on your real desk in passthrough.
 Then you fix it with your hands: pinch, slide, snap, tap, drop it in the bin, undo. You never need to pick up a controller.
 
@@ -38,7 +38,7 @@ Everything sits within about 60 cm of a seated user, and the dock is in the lowe
 
 ## Tetris mode
 
-Tap **TETRIS** on the mode bar (or say **“let's play Tetris”**) and the desk turns into a 10 × 4 × 14 neon well.
+Open **ARCADE** and pick **Tetris** (or say **“let's play Tetris”**) and the desk turns into a 10 × 4 × 14 neon well.
 The room dims, a hue-cycling vector tunnel and a warp starfield stream out behind the well, and a synthwave loop speeds up with every level.
 The same cube blocks fall as the seven classic tetrominoes. Fill a straight row from left to right and it blows up
 in sparkles. Fill a whole layer and you get a big bonus. Blocks above a cleared row fall into its slice.
@@ -57,7 +57,7 @@ Your build desk is untouched while you play. Say **“back to building”** to r
 
 ## Angry Sling
 
-Tap **ANGRY SLING** on the mode bar (left edge of the desk), or say **“angry sling”**. A tabletop physics puzzle appears:
+Open **ARCADE** and pick **Angry Sling**, or say **“angry sling”**. A tabletop physics puzzle appears:
 pull back the slingshot, let a glowing pebble fly, and knock down glass, wood and stone towers to pop the purple
 *gloomlings* hiding in them. There are **12 levels** (First flight → Citadel), 3 stars each, and progress is saved on the device.
 
@@ -70,18 +70,18 @@ pull back the slingshot, let a glowing pebble fly, and knock down glass, wood an
 The physics (cannon-es) is simulated at full scale (1 m blocks) and rendered at 1:10, so towers fall with real weight.
 Glass shatters easily, wood takes a few hits, stone is tough. Every level is unit-tested to stand still until hit and not collapse on its own.
 
-## Arcade (7 more games)
+## Arcade (9 games)
 
-Tap **ARCADE** on the mode bar (or say **“open the arcade”**, **“play galago”**, **“mike penguin”**…) and seven tiles appear on the desk. Poke or pinch one, press 1–7, or click the buttons. Every game works with hands, Quest controllers, mouse, touch and keyboard. Each one has its own synthesised theme tune and sound effects, its best score is saved on the device, and a How to play card is on the desk and on screen.
+The mode bar on the left edge of the desk has two buttons: **BUILD** and **ARCADE**. Tap **ARCADE** (or say **“open the arcade”**, **“play star swarm”**, **“mike penguin”**…) and nine tiles appear on the desk: Tetris, Angry Sling and the seven below. Poke or pinch one, press 1–9, or click the buttons. Every game works with hands, Quest controllers, mouse, touch and keyboard. Each one has its own synthesised theme tune and sound effects, its best score is saved on the device, and a How to play card is on the desk and on screen.
 
 | Game | What you do | Hands | Keyboard |
 |---|---|---|---|
-| **Galago** | Space shooter: an alien swarm hovers at the back of the desk and dives at you in 3D curves | pinch + move to fly, hold to fire | arrows + Space |
+| **Star Swarm** | Space shooter: an alien swarm hovers at the back of the desk and dives at you in 3D curves | pinch + move to fly, hold to fire | arrows + Space |
 | **Marble Maze** | Tilt a wooden board to roll a steel marble to the goal. A fresh maze each level, holes from level 4, auto-advance | pinch and push the way it should roll | hold arrows |
 | **Whack-a-Gloom** | 60-second rounds: bop gloomlings (gold = 3 points, pebbles = −1), combos | poke with a finger or pinch | Q W E / A S D / Z X C |
 | **Breakout 3D** | A glass box with a brick wall at the back. Your glass paddle follows your hand; a marker shows where the ball arrives | raise your hand, pinch to launch | arrows + Space |
 | **Block Tower** | Real-physics stacking tower: pull a loose block out slowly, it goes on top. One collapse ends the game | pinch a block and pull | arrows pick, Space pushes, T to top |
-| **Fappy Bro** | *First person:* you are the bird. Flap through the gaps in the walls | pinch, or flap your arm down | Space |
+| **Flap Bro** | *First person:* you are the bird. Flap through the gaps in the walls | pinch, or flap your arm down | Space |
 | **Mike Penguin** | *First person:* race down a 3-lane ice road; jump holes and cracks, dodge seals, grab fish, reach each flag before the clock runs out | pinch-swipe to change lane, quick pinch to jump | ← → Space, hold ↓ to slow |
 
 First-person comfort: you never move. The world moves past you, and the desk and dock stay fixed in front of you.
@@ -94,6 +94,17 @@ Naga understands open phrasing through an LLM, with a fast deterministic parser 
 - **Anything else:** “build me a dragon”, “a guitar”, “a coffee mug”. When there is no ready-made model, Naga sculpts one from blocks on the spot (the LLM composes it from up to 40 boxes, with named parts you can grab and recolour). It's validated and capped at 500 blocks.
 - **Parts by name:** “paint the wheels gold”, “make the sail blue”, “move the roof left” work on every model's named parts.
 - **Edit:** “make the roof red”, “paint the windows blue”, “a bit bigger / smaller”, “rotate it”, “move it left”.
+- **Desk tools (productivity):**
+  - “make three more chairs”, “duplicate it”, “copy the car”: copies laid out in a row, each one grabbable
+  - “get rid of the chimney”, “remove the roof”: delete a part by name
+  - “mirror it”: flip left-right
+  - “replace red with blue”: swap a colour everywhere
+  - “write HELLO”, “spell TEAM in red”: block lettering for signs and labels
+  - “make a bar chart of 3, 7, 5 and 9”, “graph our sales 12 18 9”: a 3D bar chart, bars to scale
+  - “sketch a floor plan with 3 rooms”: a room layout with walls, doorways and a front door
+  - “how many blocks”, “what's on my desk”, “how tall is the castle”: spoken answers with real-world sizes in centimetres
+  - “save this as kitchen”, “load kitchen”, “list my saves”: named layouts kept on the device; loading is one step you can undo
+- **Context-aware:** each request sends the AI a short summary of what's on the desk (objects, where they are, their parts), so “put a lamp next to the bed” and “paint the table legs black” refer to real things.
 - **History:** “undo”, “redo”, “clear the desk”.
 
 If the agent is unreachable, every hand interaction still works, and typed or recognised commands fall back to the on-device parser.

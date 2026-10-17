@@ -28,7 +28,7 @@ export type DockAction =
   // arcade games
   | 'start' | 'fire' | 'totop' | 'flap' | 'jump'
   // mode bar + arcade picker
-  | 'build' | 'sling' | 'arcade' | 'galago' | 'maze' | 'whack' | 'breakout' | 'tower' | 'fappy' | 'penguin';
+  | 'build' | 'sling' | 'arcade' | 'swarm' | 'maze' | 'whack' | 'breakout' | 'tower' | 'flapbro' | 'penguin';
 
 /** What every button says: short label printed under it, longer text in the hover tooltip. */
 export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
@@ -43,11 +43,11 @@ export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
   sling: ['ANGRY SLING', 'Play Angry Sling'],
   build: ['BUILD', 'Back to building'],
   arcade: ['ARCADE', 'More games: pick one'],
-  fappy: ['FAPPY BRO', 'Play Fappy Bro: first-person flapping'],
+  flapbro: ['FLAP BRO', 'Play Flap Bro: first-person flapping'],
   penguin: ['MIKE PENGUIN', 'Play Mike Penguin: first-person ice run'],
   flap: ['FLAP', 'Flap your wings'],
   jump: ['JUMP', 'Jump'],
-  galago: ['GALAGO', 'Play Galago: space shooter'],
+  swarm: ['STAR SWARM', 'Play Star Swarm: space shooter'],
   maze: ['MARBLE MAZE', 'Play Marble Maze: tilt to roll'],
   whack: ['WHACK', 'Play Whack-a-Gloom'],
   breakout: ['BREAKOUT', 'Play 3D Breakout'],
@@ -97,23 +97,22 @@ export const SLING_LAYOUT: Array<[DockAction, number]> = [
 
 /** Mode switcher: a short column on the left edge of the desk, visible in every mode. */
 export const MODE_LAYOUT: Array<[DockAction, number]> = [
-  ['build', 0.02],
-  ['game', 0.02],
-  ['sling', 0.02],
-  ['arcade', 0.02],
+  ['build', 0.022],
+  ['arcade', 0.022],
 ];
 
 /** Arcade picker: big tiles on the desk, one per game. */
 export const ARCADE_TILES: Array<[DockAction, number]> = [
-  ['galago', 0.032], ['maze', 0.032], ['whack', 0.032], ['breakout', 0.032],
-  ['tower', 0.032], ['fappy', 0.032], ['penguin', 0.032],
+  ['game', 0.03], ['sling', 0.03], ['swarm', 0.03],
+  ['maze', 0.03], ['whack', 0.03], ['breakout', 0.03],
+  ['tower', 0.03], ['flapbro', 0.03], ['penguin', 0.03],
 ];
 export const ARCADE_LAYOUT: Array<[DockAction, number]> = [['exit', 0.024], ['mic', 0.024]];
-export const FAPPY_LAYOUT: Array<[DockAction, number]> = [['exit', 0.024], ['start', 0.024], ['flap', 0.034], ['pause', 0.024], ['mic', 0.024]];
+export const FLAPBRO_LAYOUT: Array<[DockAction, number]> = [['exit', 0.024], ['start', 0.024], ['flap', 0.034], ['pause', 0.024], ['mic', 0.024]];
 export const PENGUIN_LAYOUT: Array<[DockAction, number]> = [['exit', 0.024], ['start', 0.024], ['jump', 0.034], ['pause', 0.024], ['mic', 0.024]];
 
 const G = 0.024;
-export const GALAGO_LAYOUT: Array<[DockAction, number]> = [['exit', G], ['start', G], ['fire', 0.03], ['pause', G], ['mic', G]];
+export const SWARM_LAYOUT: Array<[DockAction, number]> = [['exit', G], ['start', G], ['fire', 0.03], ['pause', G], ['mic', G]];
 export const MAZE_LAYOUT: Array<[DockAction, number]> = [['exit', G], ['retry', G], ['next', G], ['pause', G], ['mic', G]];
 export const WHACK_LAYOUT: Array<[DockAction, number]> = [['exit', G], ['start', G], ['pause', G], ['mic', G]];
 export const BREAKOUT_LAYOUT: Array<[DockAction, number]> = [['exit', G], ['start', G], ['fire', G], ['next', G], ['pause', G], ['mic', G]];
@@ -566,7 +565,7 @@ function iconTexture(id: DockAction): CanvasTexture {
       g.fillRect(58, 40, 12, 46);
       g.beginPath(); g.arc(64, 36, 16, 0, Math.PI * 2); g.fill();
       break;
-    case 'fappy':
+    case 'flapbro':
     case 'flap': // wing
       g.beginPath(); g.moveTo(20, 70); g.quadraticCurveTo(50, 20, 108, 34); g.quadraticCurveTo(84, 52, 96, 60); g.quadraticCurveTo(70, 66, 80, 80); g.quadraticCurveTo(50, 86, 20, 70); g.fill();
       break;
@@ -579,7 +578,7 @@ function iconTexture(id: DockAction): CanvasTexture {
       g.beginPath(); g.moveTo(64, 16); g.lineTo(100, 56); g.lineTo(76, 56); g.lineTo(76, 84); g.lineTo(52, 84); g.lineTo(52, 56); g.lineTo(28, 56); g.closePath(); g.fill();
       g.fillRect(28, 100, 72, 10);
       break;
-    case 'galago': // little ship
+    case 'swarm': // little ship
       g.beginPath(); g.moveTo(64, 18); g.lineTo(98, 100); g.lineTo(64, 84); g.lineTo(30, 100); g.closePath(); g.fill();
       break;
     case 'maze':

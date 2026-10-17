@@ -31,13 +31,14 @@ export class AgentClient {
   }
 
   /** Text utterance -> envelope. Falls back to the local parser on any failure. */
-  async sendText(text: string): Promise<AgentEnvelope> {
+  async sendText(text: string, scene = ''): Promise<AgentEnvelope> {
     try {
       const r = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text }),
-        signal: AbortSignal.timeout(9000),
+        body: JSON.stringify({ text, scene }),
+        // sculpting something new can take the model ~10–15 s
+        signal: AbortSignal.timeout(22000),
       });
       const env = sanitizeEnvelope(await r.json());
       if (r.ok && env) return { ...env, transcript: env.transcript ?? text };
@@ -49,12 +50,12 @@ export class AgentClient {
   }
 
   /** Recorded clip -> server STT -> envelope. Throws 'stt_unavailable' so the caller can explain. */
-  async sendAudio(blob: Blob): Promise<AgentEnvelope> {
+  async sendAudio(blob: Blob, scene = ''): Promise<AgentEnvelope> {
     const r = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'content-type': blob.type || 'audio/webm' },
+      headers: { 'content-type': blob.type || 'audio/webm', 'x-naga-scene': encodeURIComponent(scene.slice(0, 600)) },
       body: blob,
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(30000),
     });
     const j = await r.json().catch(() => null);
     if (!r.ok) throw new Error((j as { error?: string } | null)?.error ?? `http_${r.status}`);

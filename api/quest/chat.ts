@@ -30,7 +30,7 @@ function cors(req: Request): Record<string, string> {
   const allowed = (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const ok = allowed.includes('*') || allowed.includes(origin);
   return ok
-    ? { 'access-control-allow-origin': origin || '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type', vary: 'origin' }
+    ? { 'access-control-allow-origin': origin || '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type, x-naga-scene', vary: 'origin' }
     : {};
 }
 
@@ -67,6 +67,12 @@ export async function POST(req: Request): Promise<Response> {
 
   const type = (req.headers.get('content-type') ?? '').toLowerCase();
   let text = '';
+  let scene = '';
+  try {
+    scene = decodeURIComponent(req.headers.get('x-naga-scene') ?? '').slice(0, 600);
+  } catch {
+    /* ignore */
+  }
   try {
     if (type.startsWith('audio/') || type.startsWith('application/octet-stream')) {
       const buf = await req.arrayBuffer();
@@ -75,7 +81,8 @@ export async function POST(req: Request): Promise<Response> {
       text = await transcribe(env, buf);
       if (!text) return json({ speech: "Sorry, I didn't catch that.", build: null, transcript: '' }, 200, req);
     } else {
-      const body = (await req.json().catch(() => null)) as { text?: unknown } | null;
+      const body = (await req.json().catch(() => null)) as { text?: unknown; scene?: unknown } | null;
+      if (body && typeof body.scene === 'string') scene = body.scene.slice(0, 600);
       if (!body || typeof body.text !== 'string' || !body.text.trim()) return json({ error: 'bad_request' }, 400, req);
       text = body.text.trim().slice(0, MAX_TEXT);
     }
@@ -83,7 +90,7 @@ export async function POST(req: Request): Promise<Response> {
     return json({ error: 'stt_failed', detail: String((e as Error).message).slice(0, 80) }, 502, req);
   }
 
-  const envelope = await decide(env, text);
+  const envelope = await decide(env, text, scene);
   const audio = await synthesize(env, envelope.speech).catch(() => null);
   return json({ ...envelope, audio }, 200, req);
 }

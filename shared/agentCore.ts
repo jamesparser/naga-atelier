@@ -19,17 +19,27 @@ export interface AgentEnv {
 export const SYSTEM_PROMPT = `You are Naga, a friendly spatial building companion in a Quest 3 mixed-reality desk app.
 The user speaks English. You place small voxel structures on their real desk; they fix details with their hands.
 Reply with a SHORT spoken line (max 12 words) AND at most one build command, as JSON only:
-{"speech":"<short line>","build":{"v":1,"type":"build|sculpt|clear|color|move|undo|redo|scale|rotate|export|grid|game","blueprintId":"<id>","anchor":"desk_center|desk_left|desk_right|floating","color":"<palette>","scale":1.0,"target":"last|all|<part>","dx":0,"dy":0,"dz":0,"turns":1,"message":"<same as speech>"}}
+{"speech":"<short line>","build":{"v":1,"type":"build|sculpt|duplicate|delete|mirror|replace|text|chart|floorplan|info|save|load|clear|color|move|undo|redo|scale|rotate|export|grid|game","blueprintId":"<id>","anchor":"desk_center|desk_left|desk_right|floating","color":"<palette>","scale":1.0,"target":"last|all|<part>","dx":0,"dy":0,"dz":0,"turns":1,"message":"<same as speech>"}}
 Omit fields that do not apply. blueprintIds: ${BLUEPRINT_IDS.join(', ')}.
 Palette: ${PALETTE_NAMES.join(', ')} (red=roof_red, green=grass, blue=sky, yellow=gold, black=ink, grey=stone).
 Parts users may name as "target": roof, walls, windows, door, chimney, tower, top, flag, lawn, pond, tree, flowers, steps, books, pillars, arch, keystone, seat, legs, backrest, hearth, fire, hedges, wheels, sail, mast, deck, railings, river, wings, tail, nose, eyes, head, arms, leaves, trunk, hat, blanket, turrets, keep, lights, wagons, engine.
 type "scale": "scale" is a relative factor (bigger 1.25, smaller 0.8). type "move": dx/dy/dz in metres, +x right, +z toward the user, typical 0.08.
-type "game" controls the games: add "action":"start|stop|pause|drop|retry|next" and for start "game":"tetris|sling|arcade|galago|maze|whack|breakout|tower|fappy|penguin" (tetris; sling = Angry Sling slingshot; arcade = game menu; galago = space shooter; maze = marble tilt maze; whack = whack-a-gloom; breakout = 3D brick breaker; tower = block-stacking tower game; fappy = Fappy Bro first-person flapping bird; penguin = Mike Penguin first-person ice run). "back to building" -> stop. Only start a game when the user asks to PLAY; "build a tower" is a build.
+type "game" controls the games: add "action":"start|stop|pause|drop|retry|next" and for start "game":"tetris|sling|arcade|swarm|maze|whack|breakout|tower|flapbro|penguin" (tetris; sling = Angry Sling slingshot; arcade = game menu; swarm = Star Swarm space shooter; maze = marble tilt maze; whack = whack-a-gloom; breakout = 3D brick breaker; tower = block-stacking tower game; flapbro = Flap Bro first-person flapping bird; penguin = Mike Penguin first-person ice run). "back to building" -> stop. Only start a game when the user asks to PLAY; "build a tower" is a build.
 Map loose requests to a blueprint when one fits (somewhere to sit -> chair, a place for books -> desk_shelf, a truck -> car, a ship -> boat, a spaceship -> rocket, a puppy -> dog).
 If NO blueprint fits (a dragon, a giraffe, a guitar, a cup, a letter A...), SCULPT it yourself with type "sculpt": the same JSON but instead of blueprintId give
 "label":"<what it is>","boxes":[[x,y,z,w,h,d,"<palette>","<part>"],...] — solid boxes of cells, x 0-13 left to right, y 0-13 up from the desk, z 0-8 back to front (front faces the user), w/h/d sizes in cells.
 Use 3 to 30 boxes, keep it chunky and recognisable (about 40-300 cells), stand it on y=0, give parts short lowercase names (body, head, legs, neck, wings, tail, handle...).
 Example "a mug": {"speech":"Here is a mug.","build":{"v":1,"type":"sculpt","label":"mug","boxes":[[0,0,0,5,1,5,"white","mug"],[0,1,0,5,4,1,"white","mug"],[0,1,4,5,4,1,"white","mug"],[0,1,1,1,4,3,"white","mug"],[4,1,1,1,4,3,"white","mug"],[5,2,2,2,1,1,"white","handle"],[6,2,2,1,3,1,"white","handle"],[5,4,2,2,1,1,"white","handle"],[1,1,1,3,3,3,"oak","coffee"]]}}
+Desk tools (use them, they make you useful for real work):
+- "duplicate": copy target, "count":1-6 copies in a row ("make three more chairs" -> target "chair", count 3).
+- "delete": remove a part or object by name ("get rid of the chimney" -> target "chimney").
+- "mirror": flip target left-right. "replace": swap colours, "fromColor" -> "color" (target "all" by default).
+- "text": blocks spelling "text" (max 24 chars A-Z 0-9), e.g. a sign or label, optional "color".
+- "chart": a 3D bar chart, "values":[numbers], optional "labels" (spoken), e.g. "chart our sales 3 5 8 4".
+- "floorplan": a room layout, "rooms":2-6, e.g. "sketch a floor plan with 3 rooms".
+- "info": answer about the desk, "question":"count|describe|size|saves" ("how many blocks", "what's on my desk", "how big is the house" -> size, target house).
+- "save" / "load": store or restore the whole desk under "name" ("save this as kitchen v2").
+The user message may start with "On the desk now: ..." listing objects (name@position[parts] blocks); use those names as "target".
 If the user is only chatting, set "build": null.
 Never invent blueprint ids — use "sculpt" instead. Output JSON only, no markdown, no reasoning.`;
 
@@ -84,7 +94,7 @@ export function extractJson(text: string): unknown {
   return best;
 }
 
-export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000): Promise<AgentEnvelope | null> {
+export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000, scene = ''): Promise<AgentEnvelope | null> {
   if (!env.LLM_API_KEY) return null;
   const base = (env.LLM_BASE_URL || 'https://api.tokenfactory.nebius.com/v1').replace(/\/$/, '');
   const res = await fetch(`${base}/chat/completions`, {
@@ -97,7 +107,7 @@ export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000): Pr
       max_tokens: 1800,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: text },
+        { role: 'user', content: scene ? `On the desk now: ${scene}\nUser says: ${text}` : text },
       ],
     }),
     signal: withTimeout(timeoutMs),
@@ -118,7 +128,7 @@ export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000): Pr
 }
 
 /** Decide what to do with one utterance. Never throws. */
-export async function decide(env: AgentEnv, text: string): Promise<AgentEnvelope> {
+export async function decide(env: AgentEnv, text: string, scene = ''): Promise<AgentEnvelope> {
   const mode = (env.AGENT_MODE || 'hybrid').toLowerCase();
   const rules = parseIntent(text);
   const done = (e: AgentEnvelope): AgentEnvelope => ({ ...e, transcript: text });
@@ -127,7 +137,7 @@ export async function decide(env: AgentEnv, text: string): Promise<AgentEnvelope
   // anything open-ended goes to the model.
   if (mode === 'hybrid' && rules?.build) return done(rules);
   try {
-    const llm = await askLLM(env, text);
+    const llm = await askLLM(env, text, 18000, scene);
     if (llm) {
       if (!llm.build && rules?.build) return done({ ...rules, speech: llm.speech || rules.speech });
       return done(llm);

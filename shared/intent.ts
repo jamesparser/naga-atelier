@@ -156,14 +156,14 @@ export function parseIntent(raw: string): AgentEnvelope | null {
   if (/\b(stop|exit|quit|end|leave|close) (the )?(game|tetris)\b/.test(t) || /\b(build(ing)? mode|back to build(ing)?)\b/.test(t)) {
     return envelope('Back to building.', { v: 1, type: 'game', action: 'stop' });
   }
-  // arcade games (checked before Tetris so "play galago" is not read as "play a game")
+  // arcade games (checked before Tetris so "play star swarm" is not read as "play a game")
   const arcade: Array<[RegExp, string, string]> = [
-    [/\b(galago|galaga|space ?shooter|shoot(ing)? (the )?aliens?|space invaders?|alien game)\b/, 'galago', 'Galago! Blast the swarm.'],
+    [/\b(star ?swarm|galago|galaga|space ?shooter|shoot(ing)? (the )?aliens?|space invaders?|alien game)\b/, 'swarm', 'Star Swarm! Blast the swarm.'],
     [/\b(marble( maze)?|tilt( maze| game)?|labyrinth game|ball maze)\b/, 'maze', 'Marble Maze — tilt to roll.'],
     [/\b(whack|bop|mole)/, 'whack', 'Whack-a-Gloom! Bop them.'],
     [/\b(breakout|brick ?breaker|bricks game|arkanoid|paddle game)\b/, 'breakout', 'Breakout 3D!'],
     [/\b(block tower|jenga|tower game|stacking game|pull (a |the )?blocks?)\b/, 'tower', 'Block Tower — pull slowly.'],
-    [/\b(fappy|flappy|flap(py)? bro|flapping game|bird game)\b/, 'fappy', 'Fappy Bro! Flap through the gaps.'],
+    [/\b(flap ?bro|fappy|flappy|flappy bro|flapping game|bird game)\b/, 'flapbro', 'Flap Bro! Flap through the gaps.'],
     [/\b(mike penguin|penguin( game| run| adventure)?|ice run)\b/, 'penguin', 'Mike Penguin! Run for the flag.'],
     [/\b(arcade|more games|other games|mini ?games?|game menu|pick a game)\b/, 'arcade', 'Arcade! Pick a game.'],
   ];
@@ -231,6 +231,10 @@ export function parseIntent(raw: string): AgentEnvelope | null {
   if (/\b(next grid|change (grid|block size)|cycle (grid|blocks)|block size)\b/.test(t)) {
     return envelope('Cycling block size.', { v: 1, type: 'grid' });
   }
+
+  // --- productivity tools ---------------------------------------------------------
+  const tool = parseTool(t, raw);
+  if (tool) return tool;
 
   const blueprint = findBlueprint(t);
   const color = findColor(t);
@@ -304,6 +308,80 @@ export function parseIntent(raw: string): AgentEnvelope | null {
   }
   if (/\b(thanks|thank you|nice|cool|awesome|great|love it)\b/.test(t)) {
     return envelope(pick(['Anytime.', 'Happy to help.', 'Glad you like it.'], t), null);
+  }
+  return null;
+}
+
+const NUM_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, a: 1, another: 1, couple: 2, few: 3 };
+const PALETTE_WORD = (w: string): PaletteName | null => {
+  for (const [re, name] of COLOR_WORDS) if (re.test(` ${w} `)) return name;
+  return null;
+};
+
+/** Duplicate / delete / mirror / colour swap / text / chart / floor plan / info / save / load. */
+function parseTool(t: string, raw: string): AgentEnvelope | null {
+  const cluster = findCluster(t);
+  const bp = findBlueprint(t);
+  // a named object or part: "the chair", "the roof"
+  // "the car" names an object; "on the left" / "the desk" do not
+  const det = /\b(the|that|this|my|those|these) (?!left\b|right\b|desk\b|middle\b|front\b|back\b)/.test(t);
+  const target = cluster ?? (bp && det ? bp[0] : null);
+  // info --------------------------------------------------------------------------
+  if (/\b(list|show|what are) (my )?(saves|saved|layouts)\b/.test(t)) return envelope('Your saved layouts:', { v: 1, type: 'info', question: 'saves' });
+  if (/\bhow many (blocks|cubes|pieces|voxels)\b/.test(t)) return envelope('Counting.', { v: 1, type: 'info', question: 'count', target: target ?? 'all' });
+  if (/\b(how (big|tall|wide|long|high|large) is|measure|dimensions|what size)\b/.test(t)) return envelope('Measuring.', { v: 1, type: 'info', question: 'size', target: target ?? 'last' });
+  if (/\b(what('| i)?s on (my|the) desk|describe (my |the )?(desk|scene|build)|what did (i|we) build|what have (i|we) (got|built))\b/.test(t)) return envelope('Here is your desk.', { v: 1, type: 'info', question: 'describe' });
+  // save / load ---------------------------------------------------------------------
+  const nameM = raw.toLowerCase().match(/\b(?:as|called|named)\s+["“']?([a-z0-9 _-]{1,20}?)["”']?\s*[.!?]?$/);
+  if (/\b(save|store|keep) (this|it|my desk|the desk|the layout|this layout)\b/.test(t) && !/\b(html|file|export)\b/.test(t)) {
+    const name = nameM?.[1]?.trim() || 'my desk';
+    return envelope(`Saving as ${name}.`, { v: 1, type: 'save', name });
+  }
+  const loadM = raw.toLowerCase().match(/\b(?:load|open|restore|bring back)\s+(?:my |the |layout |plan )*["“']?([a-z0-9 _-]{1,20}?)["”']?\s*[.!?]?$/);
+  if (loadM && !/\b(game|arcade|tetris)\b/.test(t)) return envelope(`Loading ${loadM[1].trim()}.`, { v: 1, type: 'load', name: loadM[1].trim() });
+  // text ----------------------------------------------------------------------------------
+  const textM = raw.match(/\b(?:write|spell|sign (?:that )?(?:says|reads)|text|letters? for|label (?:it )?)\s*[:]?\s*["“']?([A-Za-z0-9 !?.\-]{1,24}?)["”']?\s*(?:in (?:blocks|gold|red|blue|green|white|black))?\s*[.!]?$/i);
+  if (textM && textM[1].trim() && /\b(write|spell|sign|text|letters|label)\b/.test(t)) {
+    const color = findColor(t.replace(textM[1].toLowerCase(), ''));
+    const cmd: BuildCommand = { v: 1, type: 'text', text: textM[1].trim().toUpperCase(), anchor: 'desk_center' };
+    if (color) cmd.color = color[0];
+    return envelope(`Writing ${textM[1].trim()}.`, cmd);
+  }
+  // chart -----------------------------------------------------------------------------------
+  if (/\b(chart|graph|bars?|plot)\b/.test(t)) {
+    const nums = (raw.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number).filter((n) => n >= 0).slice(0, 10);
+    if (nums.length) return envelope(`Charting ${nums.length} value${nums.length === 1 ? '' : 's'}.`, { v: 1, type: 'chart', values: nums, anchor: 'desk_center' });
+  }
+  // floor plan --------------------------------------------------------------------------------
+  if (/\b(floor ?plan|room layout|office layout|layout with \w+ rooms|(\d|two|three|four|five|six) rooms)\b/.test(t)) {
+    const n = Number(t.match(/(\d) rooms?/)?.[1] ?? NUM_WORDS[t.match(/\b(two|three|four|five|six) rooms?\b/)?.[1] ?? ''] ?? 4);
+    return envelope(`Sketching ${n} rooms.`, { v: 1, type: 'floorplan', rooms: n, anchor: 'desk_center' });
+  }
+  // duplicate --------------------------------------------------------------------------------
+  const dup = /\b(duplicate|copy|clone|another one|one more|(\w+) more\b)/.test(t) && !/\bundo\b/.test(t);
+  if (dup && /\b(duplicate|copy|clone|make|add|build|give|place|put|another|one more|more)\b/.test(t)) {
+    const m = t.match(/\b(\d|one|two|three|four|five|six|a couple|a few) (more|copies|times|of (it|them|those))\b/) ?? t.match(/\b(\d|two|three|four|five|six) (\w+s)\b/);
+    let count = m ? Number(m[1]) || NUM_WORDS[m[1].replace('a ', '')] || 1 : 1;
+    if (/\bin a row\b/.test(t) && count === 1) count = 3;
+    const tgt = target ?? (bp ? bp[0] : 'last');
+    return envelope(count > 1 ? `Making ${count} copies.` : 'Copied.', { v: 1, type: 'duplicate', target: tgt, count });
+  }
+  // delete a part -----------------------------------------------------------------------------
+  if (/\b(delete|remove|get rid of|take away|take off|erase|destroy)\b/.test(t) && !/\b(everything|all|it all|the desk)\b/.test(t)) {
+    return envelope(target ? `Removed the ${target}.` : 'Removed it.', { v: 1, type: 'delete', target: target ?? 'last' });
+  }
+  // mirror ----------------------------------------------------------------------------------------
+  if (/\b(mirror|flip)\b/.test(t)) return envelope('Mirrored.', { v: 1, type: 'mirror', target: target ?? 'last' });
+  // recolour a whole object by name: "make the house red" (vs "build a red house")
+  const col = findColor(t);
+  if (col && bp && !cluster && det && /\b(paint|colou?r|turn|change|make|dye)\b/.test(t) && !/\b(build|create|place|put|add|spawn|draw|construct)\b/.test(t)) {
+    return envelope(`The ${bp[1].split(' ').pop()} is ${col[1]} now.`, { v: 1, type: 'color', color: col[0], target: bp[0] });
+  }
+  // colour swap: "replace red with blue", "change all the red to blue", "swap red for blue" -------------
+  const sw = t.match(/\b(?:replace|swap|change|turn) (?:all )?(?:the )?(\w+)(?: blocks?| ones)? (?:with|for|to|into) (\w+)\b/);
+  if (sw) {
+    const from = PALETTE_WORD(sw[1]), to = PALETTE_WORD(sw[2]);
+    if (from && to && from !== to) return envelope(`Swapped ${sw[1]} for ${sw[2]}.`, { v: 1, type: 'replace', fromColor: from, color: to, target: 'all' });
   }
   return null;
 }

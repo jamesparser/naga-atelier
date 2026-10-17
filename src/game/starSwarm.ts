@@ -1,5 +1,5 @@
 /**
- * Galago — an original 3D swarm shooter on the desk. Alien formations hover at the back of the
+ * Star Swarm — an original 3D swarm shooter on the desk. Alien formations hover at the back of the
  * desk, peel off and dive at you in 3D curves; you fly a little ship at the front and blast them.
  */
 import {
@@ -26,8 +26,8 @@ import {
 } from 'three';
 import { sfx } from '../audio/sfx.js';
 import { Sparkles, dotTexture } from '../fx/sparkles.js';
-import { GALAGO_LAYOUT } from '../ui/dock.js';
-import { GALAGO_PAD } from '../ui/screenPad.js';
+import { SWARM_LAYOUT } from '../ui/dock.js';
+import { SWARM_PAD } from '../ui/screenPad.js';
 import { GameBase, type GameHost, type PointerFrame } from './gameBase.js';
 
 const X = 0.22, Y0 = 0.08, Y1 = 0.36;
@@ -51,7 +51,7 @@ interface Shot {
 const KIND_COLOR = [0x4fd1ff, 0xff5fd2, 0xffd166];
 const KIND_POINTS = [100, 160, 400];
 
-export class Galago extends GameBase {
+export class StarSwarm extends GameBase {
   private aliens: Alien[] = [];
   private shots: Shot[] = [];
   private bombs: Shot[] = [];
@@ -79,7 +79,7 @@ export class Galago extends GameBase {
   private tmpQ = new Quaternion();
 
   constructor(deskRoot: Object3D, host: GameHost) {
-    super(deskRoot, host, GALAGO_LAYOUT, GALAGO_PAD, 'naga-atelier:galago-best:v1', 'galago');
+    super(deskRoot, host, SWARM_LAYOUT, SWARM_PAD, 'naga-atelier:swarm-best:v1', 'swarm');
     const geos = [new OctahedronGeometry(0.016, 0), new TetrahedronGeometry(0.02, 0), new DodecahedronGeometry(0.019, 0)];
     this.meshes = geos.map((g, i) => {
       const m = new InstancedMesh(g, new MeshStandardMaterial({ color: KIND_COLOR[i], emissive: KIND_COLOR[i], emissiveIntensity: 0.55, roughness: 0.4, flatShading: true }), 40);
@@ -130,7 +130,7 @@ export class Galago extends GameBase {
     this.lives = 3;
     this.score = 0;
     this.spawnWave();
-    this.host.say('Galago! Pinch and move to fly — you fire while you pinch.');
+    this.host.say('Star Swarm! Pinch and move to fly — you fire while you pinch.');
   }
 
   private spawnWave(): void {
@@ -397,7 +397,7 @@ export class Galago extends GameBase {
     }
     (this.stars.geometry.attributes.position as BufferAttribute).needsUpdate = true;
     this.sparkles.update(dt);
-    this.panel('GALAGO', [['SCORE', String(this.score)], ['WAVE', String(this.wave)], ['SHIPS', '▲'.repeat(Math.max(0, this.lives)) || '0'], ['BEST', String(Math.max(this.best, this.score))]],
+    this.panel('STAR SWARM', [['SCORE', String(this.score)], ['WAVE', String(this.wave)], ['SHIPS', '▲'.repeat(Math.max(0, this.lives)) || '0'], ['BEST', String(Math.max(this.best, this.score))]],
       this.state === 'over' ? 'GAME OVER' : this.state === 'paused' ? 'PAUSED' : this.state === 'warp' ? 'WAVE CLEARED!' : '');
   }
 

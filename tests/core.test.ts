@@ -72,6 +72,27 @@ describe('intent parser', () => {
     ['build a tent', { type: 'build', blueprintId: 'tent' }],
     ['make a heart', { type: 'build', blueprintId: 'heart' }],
     ['paint the wheels gold', { type: 'color', color: 'gold', target: 'wheels' }],
+    ['make the house red', { type: 'color', color: 'roof_red', target: 'house_small' }],
+    ['make three more chairs', { type: 'duplicate', target: 'chair', count: 3 }],
+    ['duplicate it', { type: 'duplicate', target: 'last', count: 1 }],
+    ['copy the car', { type: 'duplicate', target: 'car' }],
+    ['get rid of the chimney', { type: 'delete', target: 'chimney' }],
+    ['remove the roof', { type: 'delete', target: 'roof' }],
+    ['mirror it', { type: 'mirror', target: 'last' }],
+    ['replace red with blue', { type: 'replace', fromColor: 'roof_red', color: 'sky' }],
+    ['change all the green to gold', { type: 'replace', fromColor: 'grass', color: 'gold' }],
+    ['write HELLO', { type: 'text', text: 'HELLO' }],
+    ['spell team in red', { type: 'text', text: 'TEAM', color: 'roof_red' }],
+    ['make a bar chart of 3, 7, 5 and 9', { type: 'chart', values: [3, 7, 5, 9] }],
+    ['graph our sales 12 18 9', { type: 'chart', values: [12, 18, 9] }],
+    ['sketch a floor plan with 3 rooms', { type: 'floorplan', rooms: 3 }],
+    ['an office layout with five rooms', { type: 'floorplan', rooms: 5 }],
+    ['how many blocks are there', { type: 'info', question: 'count' }],
+    ["what's on my desk", { type: 'info', question: 'describe' }],
+    ['how tall is the castle', { type: 'info', question: 'size', target: 'castle' }],
+    ['save this as kitchen', { type: 'save', name: 'kitchen' }],
+    ['load kitchen', { type: 'load', name: 'kitchen' }],
+    ['list my saves', { type: 'info', question: 'saves' }],
     ['make the sail blue', { type: 'color', color: 'sky', target: 'sail' }],
     ['move it left', { type: 'move', dx: -0.08 }],
     ['rotate it', { type: 'rotate', turns: 1 }],
@@ -82,13 +103,13 @@ describe('intent parser', () => {
     ['drop', { type: 'game', action: 'drop' }],
     ['pause', { type: 'game', action: 'pause' }],
     ['play angry sling', { type: 'game', action: 'start', game: 'sling' }],
-    ['play galago', { type: 'game', action: 'start', game: 'galago' }],
+    ['play star swarm', { type: 'game', action: 'start', game: 'swarm' }],
     ["let's play marble maze", { type: 'game', action: 'start', game: 'maze' }],
     ['whack a gloom', { type: 'game', action: 'start', game: 'whack' }],
     ['play breakout', { type: 'game', action: 'start', game: 'breakout' }],
     ['play jenga', { type: 'game', action: 'start', game: 'tower' }],
-    ['play fappy bro', { type: 'game', action: 'start', game: 'fappy' }],
-    ['play flappy bird', { type: 'game', action: 'start', game: 'fappy' }],
+    ['play flap bro', { type: 'game', action: 'start', game: 'flapbro' }],
+    ['play flappy bird', { type: 'game', action: 'start', game: 'flapbro' }],
     ['mike penguin', { type: 'game', action: 'start', game: 'penguin' }],
     ['open the arcade', { type: 'game', action: 'start', game: 'arcade' }],
     ['next level', { type: 'game', action: 'next' }],
@@ -250,5 +271,78 @@ describe('sculpt (agent-composed shapes)', () => {
     const m = new VoxelModel();
     executeCommand(m, c);
     expect(m.size).toBeLessThanOrEqual(500);
+  });
+});
+
+import { chartBlueprint, describeDesk, duplicateChanges, floorplanBlueprint, layoutText, measure, sceneSummary, textBlueprint } from '../src/agent/tools';
+
+describe('desk tools', () => {
+  const build = (m: VoxelModel, id: string, anchor: 'desk_left' | 'desk_center' | 'desk_right' = 'desk_center') =>
+    executeCommand(m, sanitizeCommand({ type: 'build', blueprintId: id, anchor })!);
+  it('duplicates an object into separate grabbable copies, one undo', () => {
+    const m = new VoxelModel();
+    build(m, 'chair', 'desk_left');
+    const n0 = m.size;
+    const r = executeCommand(m, sanitizeCommand({ type: 'duplicate', target: 'chair', count: 2 })!);
+    expect(r.ok).toBe(true);
+    expect(m.size).toBe(n0 * 3);
+    expect(new Set([...m.cells.values()].map((c) => c.cl!.split(':')[0])).size).toBe(3);
+    executeCommand(m, { v: 1, type: 'undo' });
+    expect(m.size).toBe(n0);
+  });
+  it('reports only the copies that fit', () => {
+    const m = new VoxelModel();
+    build(m, 'castle');
+    const d = duplicateChanges(m, [...m.cells.keys()], 6);
+    expect(d.placed).toBeLessThan(6);
+  });
+  it('targets a whole object by what it is', () => {
+    const m = new VoxelModel();
+    build(m, 'house_small', 'desk_left');
+    build(m, 'car', 'desk_right');
+    const r = executeCommand(m, sanitizeCommand({ type: 'color', color: 'sky', target: 'house_small' })!);
+    expect(r.ok).toBe(true);
+    expect([...m.cells.values()].filter((c) => c.c === 'sky').length).toBe(185);
+    expect(sceneSummary(m)).toContain('house_small');
+    expect(sceneSummary(m)).toContain('car');
+    expect(describeDesk(m)).toMatch(/2 things/);
+  });
+  it('deletes a part, mirrors, swaps colours', () => {
+    const m = new VoxelModel();
+    build(m, 'house_small');
+    const before = m.size;
+    executeCommand(m, sanitizeCommand({ type: 'delete', target: 'chimney' })!);
+    expect(m.size).toBe(before - 3);
+    expect(executeCommand(m, sanitizeCommand({ type: 'mirror', target: 'last' })!).ok).toBe(true);
+    expect(m.size).toBe(before - 3);
+    executeCommand(m, sanitizeCommand({ type: 'replace', fromColor: 'roof_red', color: 'gold' })!);
+    expect([...m.cells.values()].some((c) => c.c === 'roof_red')).toBe(false);
+  });
+  it('writes text that wraps to the grid and spawns as a sign', () => {
+    expect(layoutText('HELLO WORLD', 16)).toEqual(['HELL', 'O', 'WORL', 'D']);
+    expect(layoutText('HI TEAM', 16)).toEqual(['HI', 'TEAM']);
+    const bp = textBlueprint('HI');
+    expect(bp.voxels.length).toBeGreaterThan(15);
+    const m = new VoxelModel();
+    expect(executeCommand(m, sanitizeCommand({ type: 'text', text: 'Q4 GO!' })!).ok).toBe(true);
+  });
+  it('charts values with bars proportional to the numbers', () => {
+    const { heights } = chartBlueprint([2, 4, 8]);
+    expect(heights[2]).toBeGreaterThan(heights[1]);
+    expect(heights[1]).toBeGreaterThan(heights[0]);
+    expect(Math.round(heights[2] / heights[1])).toBe(2);
+    const m = new VoxelModel();
+    expect(executeCommand(m, sanitizeCommand({ type: 'chart', values: [3, 7, 5, 9] })!).ok).toBe(true);
+    expect(measure([...m.cells.keys()])).toMatch(/blocks/);
+  });
+  it('lays out floor plans with the right number of rooms', () => {
+    for (const n of [2, 3, 4, 5, 6]) {
+      const bp = floorplanBlueprint(n);
+      const rooms = new Set(bp.voxels.map((v) => v.cl).filter((c) => c?.startsWith('plan/room')));
+      expect(rooms.size).toBe(n);
+      const m = new VoxelModel();
+      const plan = planSpawn(m, bp, {});
+      expect(plan.clipped).toBe(false);
+    }
   });
 });

@@ -272,9 +272,9 @@ const local = (x, y, z) => page.evaluate(([x, y, z]) => window.__naga.localToWor
 const handLocal = async () => page.evaluate((p) => window.__naga.worldToLocal(...p), await stablePinch());
 await page.evaluate(() => window.__naga.setMode('arcade'));
 await wait(600);
-await pinchAt(await arc('debugTileWorld', 'galago'));
+await pinchAt(await arc('debugTileWorld', 'swarm'));
 await pinch(0); await wait(400);
-check('arcade: pinching the GALAGO tile opens Galago', (await page.evaluate(() => window.__naga.mode())) === 'galago');
+check('arcade: pinching the STAR SWARM tile opens Star Swarm', (await page.evaluate(() => window.__naga.mode())) === 'swarm');
 await wait(2500); // let the swarm fly in
 {
   await pinch(1); await wait(300);
@@ -284,7 +284,7 @@ await wait(2500); // let the swarm fly in
   await wait(3500);
   const g = await gst();
   await pinch(0);
-  check('galago: pinch-move steers the ship and holding fires', g.ship[0] > x0 + 0.02 && (g.score > 0 || g.aliens < 20), JSON.stringify(g));
+  check('star swarm: pinch-move steers the ship and holding fires', g.ship[0] > x0 + 0.02 && (g.score > 0 || g.aliens < 20), JSON.stringify(g));
 }
 await page.evaluate(() => window.__naga.setMode('whack'));
 await wait(500);
@@ -337,12 +337,12 @@ await wait(800);
   const t = await gst();
   check('tower: pinch-pull a loose block out and it goes on top, tower stands', grabbed && t.score === 1 && t.state === 'play', JSON.stringify({ grabbed, ...t, ev: await page.evaluate(() => window.__naga.arcade().events.slice(-6)) }));
 }
-await page.evaluate(() => window.__naga.setMode('fappy'));
+await page.evaluate(() => window.__naga.setMode('flapbro'));
 await wait(600);
 await pinch(1); await wait(150); await pinch(0); await wait(250);
 {
   const f = await gst();
-  check('fappy bro: a pinch flaps and starts the flight', f.state === 'play' && f.alt > 0.02, JSON.stringify(f));
+  check('flap bro: a pinch flaps and starts the flight', f.state === 'play' && f.alt > 0.02, JSON.stringify(f));
 }
 await page.evaluate(() => window.__naga.setMode('penguin'));
 await wait(600);

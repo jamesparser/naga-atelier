@@ -1,5 +1,5 @@
 /**
- * Fappy Bro — a first-person flapping game. You are the bird: flap to rise, fall between flaps and fly
+ * Flap Bro — a first-person flapping game. You are the bird: flap to rise, fall between flaps and fly
  * through the gaps in the walls that rush toward you. For comfort you never move: the world does, and
  * the desk stays put in front of you as a steady "cockpit".
  */
@@ -27,11 +27,11 @@ import {
 } from 'three';
 import { sfx } from '../audio/sfx.js';
 import { Sparkles, dotTexture } from '../fx/sparkles.js';
-import { FAPPY_LAYOUT } from '../ui/dock.js';
-import { FAPPY_PAD } from '../ui/screenPad.js';
+import { FLAPBRO_LAYOUT } from '../ui/dock.js';
+import { FLAPBRO_PAD } from '../ui/screenPad.js';
 import { GameBase, type GameHost, type PointerFrame } from './gameBase.js';
 
-export const FAPPY_NAME = 'Fappy Bro';
+export const FLAPBRO_NAME = 'Flap Bro';
 const GRAVITY = -5.2;
 const FLAP_V = 2.0;
 const SPEED0 = 2.2;
@@ -48,7 +48,7 @@ interface Wall {
   hue: number;
 }
 
-export class FappyBro extends GameBase {
+export class FlapBro extends GameBase {
   override readonly firstPerson = true;
   private world = new Group();
   private walls: Wall[] = [];
@@ -73,7 +73,7 @@ export class FappyBro extends GameBase {
   private tmpC = new Color();
 
   constructor(deskRoot: Object3D, host: GameHost) {
-    super(deskRoot, host, FAPPY_LAYOUT, FAPPY_PAD, 'naga-atelier:fappy-best:v1', 'fappy');
+    super(deskRoot, host, FLAPBRO_LAYOUT, FLAPBRO_PAD, 'naga-atelier:flapbro-best:v1', 'flapbro');
     this.root.add(this.world);
     this.wallMesh = new InstancedMesh(new BoxGeometry(WALL_W, WALL_H, WALL_D), new MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, emissive: 0x0a2a1a }), 24);
     this.rimMesh = new InstancedMesh(new BoxGeometry(WALL_W + 0.08, 0.08, WALL_D + 0.08), new MeshBasicMaterial({ color: 0xffffff }), 24);
@@ -131,7 +131,7 @@ export class FappyBro extends GameBase {
 
   protected start(): void {
     this.reset();
-    this.host.say(`${FAPPY_NAME}! You're the bird. Pinch, click or press Space to flap through the gaps.`);
+    this.host.say(`${FLAPBRO_NAME}! You're the bird. Pinch, click or press Space to flap through the gaps.`);
   }
 
   private reset(): void {
@@ -252,7 +252,7 @@ export class FappyBro extends GameBase {
     sfx.loop('wind', this.state === 'play' ? 0.25 + Math.min(0.5, Math.abs(this.vAlt) * 0.15) : 0, 500 + this.speed * 200);
     this.draw(now);
     this.sparkles.update(dt);
-    this.panel(FAPPY_NAME.toUpperCase(), [['SCORE', String(this.score)], ['BEST', String(Math.max(this.best, this.score))], ['SPEED', `${this.speed.toFixed(1)} m/s`]],
+    this.panel(FLAPBRO_NAME.toUpperCase(), [['SCORE', String(this.score)], ['BEST', String(Math.max(this.best, this.score))], ['SPEED', `${this.speed.toFixed(1)} m/s`]],
       this.state === 'ready' ? 'FLAP TO START' : this.state === 'over' ? 'BONK! FLAP TO RETRY' : this.state === 'paused' ? 'PAUSED' : '');
   }
 
