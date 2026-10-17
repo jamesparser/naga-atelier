@@ -6,15 +6,13 @@
  *
  * Secrets stay server-side (Vercel env). The client bundle never contains keys.
  */
-import { decide, synthesize, transcribe, type AgentEnv } from '../../shared/agentCore.js';
+import { DEFAULT_SCULPT_MODELS, decide, synthesize, transcribe, type AgentEnv } from '../../shared/agentCore.js';
 
 export const config = { maxDuration: 30 };
 
 const env = process.env as unknown as AgentEnv & { ALLOWED_ORIGINS?: string };
 const MAX_AUDIO = 2_000_000;
 const MAX_TEXT = 300;
-// TEMPORARY: lets us compare sculpt quality across a few models; remove after choosing.
-const TRIAL_MODELS = ['Qwen/Qwen3-235B-A22B-Instruct-2507', 'deepseek-ai/DeepSeek-V4-Flash-0731', 'zai-org/GLM-5.3-Flash', 'openai/gpt-oss-120b', 'moonshotai/Kimi-K2.6', 'nvidia/nemotron-3-super-120b-a12b', 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B', 'deepseek-ai/DeepSeek-V4-Pro', 'zai-org/GLM-5.3', 'Qwen/Qwen3.5-397B-A17B'];
 
 // Best-effort per-instance rate limit: 30 requests / minute / IP.
 const hits = new Map<string, number[]>();
@@ -67,7 +65,7 @@ export async function GET(req: Request): Promise<Response> {
       llm: !!env.LLM_API_KEY,
       tts: !!env.TTS_BASE_URL,
       llmModel: env.LLM_MODEL || null,
-      sculptModel: env.SCULPT_MODEL || null,
+      sculptModel: env.SCULPT_MODEL || DEFAULT_SCULPT_MODELS[0],
       llmBase: env.LLM_BASE_URL || 'https://api.tokenfactory.nebius.com/v1',
     },
     200,
@@ -82,7 +80,6 @@ export async function POST(req: Request): Promise<Response> {
   const type = (req.headers.get('content-type') ?? '').toLowerCase();
   let text = '';
   let scene = '';
-  let trial = '';
   try {
     scene = decodeURIComponent(req.headers.get('x-naga-scene') ?? '').slice(0, 600);
   } catch {
@@ -96,9 +93,8 @@ export async function POST(req: Request): Promise<Response> {
       text = await transcribe(env, buf);
       if (!text) return json({ speech: "Sorry, I didn't catch that.", build: null, transcript: '' }, 200, req);
     } else {
-      const body = (await req.json().catch(() => null)) as { text?: unknown; scene?: unknown; trial?: unknown } | null;
+      const body = (await req.json().catch(() => null)) as { text?: unknown; scene?: unknown } | null;
       if (body && typeof body.scene === 'string') scene = body.scene.slice(0, 600);
-      if (body && typeof body.trial === 'string' && TRIAL_MODELS.includes(body.trial)) trial = body.trial;
       if (!body || typeof body.text !== 'string' || !body.text.trim()) return json({ error: 'bad_request' }, 400, req);
       text = body.text.trim().slice(0, MAX_TEXT);
     }
@@ -106,7 +102,7 @@ export async function POST(req: Request): Promise<Response> {
     return json({ error: 'stt_failed', detail: String((e as Error).message).slice(0, 80) }, 502, req);
   }
 
-  const envelope = await decide(trial ? { ...env, SCULPT_MODEL: trial } : env, text, scene);
+  const envelope = await decide(env, text, scene);
   const audio = await synthesize(env, envelope.speech).catch(() => null);
   return json({ ...envelope, audio }, 200, req);
 }

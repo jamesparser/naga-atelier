@@ -91,7 +91,7 @@ First-person comfort: you never move. The world moves past you, and the desk and
 Naga understands open phrasing through an LLM, with a fast deterministic parser for clear commands:
 
 - **Build (29 ready-made models):** house, castle, tower, lighthouse, windmill, bridge, pyramid, arch, wall, stairs, maze, garden, tree, tent, car, train, sailboat, aeroplane, rocket, robot, dog, snowman, heart, table, chair, bench, bed, shelf, fireplace. Add *on the left / right*, *floating*, *tiny / big / huge*, or a colour.
-- **Anything else:** “build me a dragon”, “a guitar”, “a coffee mug”. When there is no ready-made model, Naga sculpts one from blocks on the spot (the LLM composes it from up to 40 boxes, with named parts you can grab and recolour). It's validated and capped at 500 blocks.
+- **Anything else:** “build me a dragon”, “a guitar”, “a laptop”. When there is no ready-made model, Naga sculpts one from blocks on the spot: a stronger model (DeepSeek V4 Flash, with gpt-oss-120b as backup) composes it from up to 60 boxes, with named parts you can grab and recolour. It's validated and capped at 600 blocks. Simple objects come out clearly recognisable; complex creatures are rougher.
 - **Parts by name:** “paint the wheels gold”, “make the sail blue”, “move the roof left” work on every model's named parts.
 - **Edit:** “make the roof red”, “paint the windows blue”, “a bit bigger / smaller”, “rotate it”, “move it left”.
 - **Desk tools (productivity):**
@@ -105,7 +105,7 @@ Naga understands open phrasing through an LLM, with a fast deterministic parser 
   - “how many blocks”, “what's on my desk”, “how tall is the castle”: spoken answers with real-world sizes in centimetres
   - “save this as kitchen”, “load kitchen”, “list my saves”: named layouts kept on the device; loading is one step you can undo
 - **Context-aware:** each request sends the AI a short summary of what's on the desk (objects, where they are, their parts), so “put a lamp next to the bed” and “paint the table legs black” refer to real things.
-- **History:** “undo”, “redo”, “clear the desk”.
+- **Grid and history:** “I need more room” (a finer grid that keeps your build), “undo”, “redo”, “clear the desk” (or the CLEAR button; UNDO brings it back).
 
 If the agent is unreachable, every hand interaction still works, and typed or recognised commands fall back to the on-device parser.
 
@@ -152,6 +152,7 @@ Copy `.env.example` to `.env` for local dev, or set these in your Vercel project
 | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | Any OpenAI-compatible chat endpoint (default: Nemotron 3 Nano on Nebius Token Factory) |
 | `ASSEMBLYAI_API_KEY` | Speech-to-text for Quest Browser (it has no built-in speech recognition) |
 | `TTS_BASE_URL`, `TTS_API_KEY`, `TTS_VOICE` | Optional OpenAI-compatible TTS (e.g. Kokoro, `am_adam`); otherwise the browser voice is used |
+| `SCULPT_MODEL` | Optional override for open-ended sculpt requests (default DeepSeek V4 Flash, then gpt-oss-120b) |
 | `AGENT_MODE` | `hybrid` (default), `llm`, or `rules` |
 | `ALLOWED_ORIGINS` | CORS allow-list if the client is hosted on another origin |
 

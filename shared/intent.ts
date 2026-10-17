@@ -401,7 +401,7 @@ function parseTool(t: string, raw: string): AgentEnvelope | null {
 /** Generic reply when nothing matched and no LLM is available. */
 export function fallbackEnvelope(raw: string): AgentEnvelope {
   return {
-    speech: "I don't know that shape yet. Try a house, tower, arch or garden.",
+    speech: "I couldn't work that one out. Try a house, car, castle, robot — or describe it simply.",
     build: null,
     transcript: raw,
     source: 'fallback',

@@ -18,6 +18,12 @@ export interface AgentEnv {
   AGENT_MODE?: string; // "hybrid" (default) | "llm" | "rules"
 }
 
+/**
+ * Models for open-ended "build me a …" requests (picked after a side-by-side test on the provider:
+ * DeepSeek V4 Flash sculpted well in ~5 s; gpt-oss-120b is the ~3 s backup). SCULPT_MODEL env overrides.
+ */
+export const DEFAULT_SCULPT_MODELS = ['deepseek-ai/DeepSeek-V4-Flash-0731', 'openai/gpt-oss-120b'];
+
 export const SYSTEM_PROMPT = `You are Naga, a friendly spatial building companion in a Quest 3 mixed-reality desk app.
 The user speaks English. You place small voxel structures on their real desk; they fix details with their hands.
 Reply with a SHORT spoken line (max 12 words) AND at most one build command, as JSON only:
@@ -121,7 +127,9 @@ export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000, sce
   const msg = data.choices?.[0]?.message;
   // Prefer content; if reasoning model spent the budget there, salvage the tail JSON.
   const content = (msg?.content ?? msg?.reasoning ?? '').trim();
-  const env2 = sanitizeEnvelope(extractJson(content));
+  let env2 = sanitizeEnvelope(extractJson(content));
+  // some models drop the opening brace: '"speech":"…","build":{…}}'
+  if (!env2 && content.includes('"speech"')) env2 = sanitizeEnvelope(extractJson(`{${content.slice(content.indexOf('"speech"'))}`));
   if (env2) {
     env2.source = 'llm';
     return env2;
@@ -143,7 +151,22 @@ export async function decide(env: AgentEnv, text: string, scene = ''): Promise<A
   try {
     // open-ended build requests ("build me a dragon") go to the sculpt model when one is set
     const wantsMaking = !rules?.build && /\b(build|make|create|sculpt|draw|construct|give me|i want|can you do)\b/i.test(text);
-    const llm = await askLLM(env, text, wantsMaking ? 26000 : 20000, scene, wantsMaking ? env.SCULPT_MODEL : undefined, wantsMaking ? 7000 : 3000);
+    let llm: AgentEnvelope | null = null;
+    if (wantsMaking) {
+      // try the sculpt models in order; each gets a slice of the 30 s function budget
+      const models = env.SCULPT_MODEL ? [env.SCULPT_MODEL, ...DEFAULT_SCULPT_MODELS] : DEFAULT_SCULPT_MODELS;
+      const budget = [15000, 9000];
+      for (let i = 0; i < 2 && !llm?.build; i++) {
+        try {
+          const r = await askLLM(env, text, budget[i], scene, models[i], 7000);
+          if (r?.build || i === 1) llm = r ?? llm;
+        } catch {
+          /* next model */
+        }
+      }
+      if (llm) llm.source = `${llm.source}:sculpt`;
+    }
+    if (!llm) llm = await askLLM(env, text, 20000, scene, undefined, 3000);
     if (llm) {
       if (!llm.build && rules?.build) return done({ ...rules, speech: llm.speech || rules.speech });
       return done(llm);
