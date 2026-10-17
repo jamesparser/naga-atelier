@@ -316,6 +316,17 @@ function start(): void {
   };
   const handleEnvelope = (env: AgentEnvelope) => {
     if (env.transcript) naga.caption.heard(env.transcript);
+    // Grid changes only happen when the user asked for one. If the AI proposes it on its own,
+    // turn it into a question instead ("Want more room? Say yes…").
+    if (env.build?.type === 'grid' && !/\b(grid|room|space|block ?size|blocks?|detail|fine|mosaic|draft|studio|bigger|smaller|finer|coarser)\b/i.test(env.transcript ?? '')) {
+      const i = GRID_PRESETS.findIndex((p) => p.id === GRID_PRESET_ID);
+      const next = GRID_PRESETS[i + 1];
+      if (next) {
+        roomOffer = { id: next.id, until: performance.now() + 25000 };
+        say(`I could switch to ${next.label.split(' ·')[0]} for more room — say yes if you'd like that. Your build comes along.`);
+      }
+      return;
+    }
     if (roomOffer && performance.now() < roomOffer.until && env.transcript && /^\s*(yes|yeah|yep|yup|sure|ok(ay)?|do it|please|go ahead|yes please)\b/i.test(env.transcript)) {
       const id = roomOffer.id;
       roomOffer = null;
