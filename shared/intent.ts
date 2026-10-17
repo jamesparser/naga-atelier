@@ -49,7 +49,7 @@ const COLOR_WORDS: Array<[RegExp, PaletteName, string]> = [
   [/\b(blue|sky|navy)\b/, 'sky', 'blue'],
   [/\b(water|teal|cyan|aqua|turquoise)\b/, 'water', 'teal'],
   [/\b(gold|golden|yellow|orange|amber)\b/, 'gold', 'gold'],
-  [/\b(black|dark|ink|charcoal)\b/, 'ink', 'ink'],
+  [/\b(black|dark|ink|charcoal)\b/, 'ink', 'black'],
   [/\b(glass|clear|transparent|crystal)\b/, 'glass', 'glass'],
 ];
 
@@ -363,7 +363,13 @@ function parseTool(t: string, raw: string): AgentEnvelope | null {
     const m = t.match(/\b(\d|one|two|three|four|five|six|a couple|a few) (more|copies|times|of (it|them|those))\b/) ?? t.match(/\b(\d|two|three|four|five|six) (\w+s)\b/);
     let count = m ? Number(m[1]) || NUM_WORDS[m[1].replace('a ', '')] || 1 : 1;
     if (/\bin a row\b/.test(t) && count === 1) count = 3;
-    const tgt = target ?? (bp ? bp[0] : 'last');
+    // the thing being copied is the noun right after the count ("two more chairs by the table")
+    let nounBp: [BlueprintId, string] | null = null;
+    for (const m of t.matchAll(/\b(?:more|copies of|copy of|copy|duplicate|clone|another|\d|two|three|four|five|six) (?:more )?(?:the |my |of the |of )?([a-z]+)/g)) {
+      nounBp = findBlueprint(m[1]);
+      if (nounBp) break;
+    }
+    const tgt = (nounBp ? nounBp[0] : null) ?? target ?? (bp ? bp[0] : 'last');
     return envelope(count > 1 ? `Making ${count} copies.` : 'Copied.', { v: 1, type: 'duplicate', target: tgt, count });
   }
   // delete a part -----------------------------------------------------------------------------

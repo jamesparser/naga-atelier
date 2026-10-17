@@ -76,6 +76,7 @@ describe('intent parser', () => {
     ['make three more chairs', { type: 'duplicate', target: 'chair', count: 3 }],
     ['duplicate it', { type: 'duplicate', target: 'last', count: 1 }],
     ['copy the car', { type: 'duplicate', target: 'car' }],
+    ['put two more chairs by the table', { type: 'duplicate', target: 'chair', count: 2 }],
     ['get rid of the chimney', { type: 'delete', target: 'chimney' }],
     ['remove the roof', { type: 'delete', target: 'roof' }],
     ['mirror it', { type: 'mirror', target: 'last' }],
