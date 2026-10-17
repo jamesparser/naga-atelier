@@ -52,6 +52,7 @@ export type InteractionEvent =
   | { type: 'painted' }
   | { type: 'deleted'; count: number }
   | { type: 'detached' }
+  | { type: 'trashTap' }
   | { type: 'dock'; action: DockAction };
 
 export class Interaction {
@@ -234,6 +235,11 @@ export class Interaction {
       this.emit({ type: 'painted' });
       return;
     }
+    if (Math.hypot(at.x - TRASH_POS.x, at.z - TRASH_POS.z) < TRASH_RADIUS + 0.02) {
+      // tapping the bin itself: explain how it works instead of doing nothing
+      this.emit({ type: 'trashTap' });
+      return;
+    }
     if (at.y > 0.3 || at.y < -0.03) return;
     let [x, y, z] = cellAt(at);
     y = Math.max(0, y);
@@ -310,7 +316,10 @@ export class Interaction {
     const pos = local.clone().add(c.grabOffset);
     pos.y += CARRY_LIFT;
     c.mesh.group.position.copy(pos);
-    const trash = Math.hypot(pos.x - TRASH_POS.x, pos.z - TRASH_POS.z) < TRASH_RADIUS + 0.02 && pos.y < 0.18;
+    // over the bin = your HAND is over it (big objects are carried far from their corner),
+    // or the carried object's centre is
+    const inBin = (v: Vector3) => Math.hypot(v.x - TRASH_POS.x, v.z - TRASH_POS.z) < TRASH_RADIUS + 0.025;
+    const trash = (inBin(local) && local.y < 0.25) || (inBin(pos) && pos.y < 0.2);
     const [ax, ay, az] = cellAt(pos);
     const d: V3i = [ax - c.anchor[0], ay - c.anchor[1], az - c.anchor[2]];
     // Never sink below the desk: lift until the lowest block sits at y >= 0.

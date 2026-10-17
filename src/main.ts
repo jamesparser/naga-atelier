@@ -501,6 +501,10 @@ function start(): void {
       case 'painted': onboarding.event('painted'); break;
       case 'deleted': onboarding.event('deleted'); break;
       case 'detached': onboarding.event('detached'); break;
+      case 'trashTap':
+        sfx.play('click');
+        say('Carry blocks onto the red bin and let go to delete them. Or say “delete the roof”. CLEAR empties the whole desk.');
+        break;
     }
   };
 
