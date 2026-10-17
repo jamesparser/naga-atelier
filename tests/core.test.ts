@@ -267,11 +267,11 @@ describe('sculpt (agent-composed shapes)', () => {
     executeCommand(m, { v: 1, type: 'undo' });
     expect(m.size).toBe(0);
   });
-  it('caps a huge shape at 500 cells', () => {
+  it('caps a huge shape at 600 cells', () => {
     const c = sanitizeCommand({ type: 'sculpt', label: 'block', boxes: [[0, 0, 0, 14, 15, 10, 'stone', 'block']] })!;
     const m = new VoxelModel();
     executeCommand(m, c);
-    expect(m.size).toBeLessThanOrEqual(500);
+    expect(m.size).toBeLessThanOrEqual(600);
   });
 });
 

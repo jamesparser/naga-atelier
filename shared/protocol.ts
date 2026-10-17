@@ -142,7 +142,7 @@ export interface SculptShape {
   label: string;
   boxes: Array<[number, number, number, number, number, number, PaletteName, string]>;
 }
-export const SCULPT_LIMITS = { maxBoxes: 40, maxX: 14, maxY: 15, maxZ: 10, maxCells: 500 } as const;
+export const SCULPT_LIMITS = { maxBoxes: 60, maxX: 14, maxY: 15, maxZ: 10, maxCells: 600 } as const;
 
 /** Validate a sculpt shape; returns null when nothing usable is left. */
 export function sanitizeShape(raw: unknown): SculptShape | null {

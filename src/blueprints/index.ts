@@ -69,7 +69,7 @@ export function blueprintFromShape(shape: SculptShape): Blueprint {
   for (const [x, y, z, w, h, d, c, part] of shape.boxes) {
     const cl = part === group || part === 'body' ? group : `${group}/${part}`;
     for (let i = x; i < x + w; i++) for (let j = y; j < y + h; j++) for (let k = z; k < z + d; k++) {
-      if (vox.size >= 500 && !vox.has(key(i, j, k))) continue;
+      if (vox.size >= 600 && !vox.has(key(i, j, k))) continue;
       vox.set(key(i, j, k), { x: i, y: j, z: k, c, cl }); // later boxes paint over earlier ones
     }
   }
