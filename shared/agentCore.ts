@@ -9,6 +9,8 @@ export interface AgentEnv {
   LLM_BASE_URL?: string;
   LLM_API_KEY?: string;
   LLM_MODEL?: string;
+  /** optional stronger model for open-ended "build me a …" requests that need sculpting */
+  SCULPT_MODEL?: string;
   ASSEMBLYAI_API_KEY?: string;
   TTS_BASE_URL?: string;
   TTS_API_KEY?: string;
@@ -39,6 +41,7 @@ Desk tools (use them, they make you useful for real work):
 - "floorplan": a room layout, "rooms":2-6, e.g. "sketch a floor plan with 3 rooms".
 - "info": answer about the desk, "question":"count|describe|size|saves" ("how many blocks", "what's on my desk", "how big is the house" -> size, target house).
 - "save" / "load": store or restore the whole desk under "name" ("save this as kitchen v2").
+- "grid": block size; "preset":"draft|studio|detail|fine|mosaic|finer|coarser" ("I need more room" -> finer). The build is kept when the grid changes.
 The user message may start with "On the desk now: ..." listing objects (name@position[parts] blocks); use those names as "target".
 If the user is only chatting, set "build": null.
 Never invent blueprint ids — use "sculpt" instead. Output JSON only, no markdown, no reasoning.`;
@@ -94,14 +97,14 @@ export function extractJson(text: string): unknown {
   return best;
 }
 
-export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000, scene = ''): Promise<AgentEnvelope | null> {
+export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000, scene = '', model?: string): Promise<AgentEnvelope | null> {
   if (!env.LLM_API_KEY) return null;
   const base = (env.LLM_BASE_URL || 'https://api.tokenfactory.nebius.com/v1').replace(/\/$/, '');
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${env.LLM_API_KEY}` },
     body: JSON.stringify({
-      model: env.LLM_MODEL || 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B',
+      model: model || env.LLM_MODEL || 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B',
       temperature: 0.2,
       // Nemotron reasoning consumes completion budget before content; 400 leaves content empty.
       max_tokens: 1800,
@@ -137,7 +140,9 @@ export async function decide(env: AgentEnv, text: string, scene = ''): Promise<A
   // anything open-ended goes to the model.
   if (mode === 'hybrid' && rules?.build) return done(rules);
   try {
-    const llm = await askLLM(env, text, 18000, scene);
+    // open-ended build requests ("build me a dragon") go to the sculpt model when one is set
+    const wantsMaking = !rules?.build && /\b(build|make|create|sculpt|draw|construct|give me|i want|can you do)\b/i.test(text);
+    const llm = await askLLM(env, text, 20000, scene, wantsMaking ? env.SCULPT_MODEL : undefined);
     if (llm) {
       if (!llm.build && rules?.build) return done({ ...rules, speech: llm.speech || rules.speech });
       return done(llm);

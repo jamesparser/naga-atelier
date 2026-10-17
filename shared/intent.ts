@@ -213,6 +213,12 @@ export function parseIntent(raw: string): AgentEnvelope | null {
     });
   }
   // --- grid / block size -----------------------------------------------
+  if (/\b(more room|more space|need (more )?(room|space)|bigger grid|larger grid|bigger desk|room for more|out of room)\b/.test(t)) {
+    return envelope('More room coming up — your build comes along.', { v: 1, type: 'grid', preset: 'finer' });
+  }
+  if (/\b(smaller grid|less room|fewer blocks)\b/.test(t)) {
+    return envelope('Bigger blocks, smaller grid.', { v: 1, type: 'grid', preset: 'coarser' });
+  }
   if (/\b(12\s*(?:[x×]|by)\s*12|draft grid|draft mode|big blocks|bigger blocks|coarse|easy blocks)\b/.test(t)) {
     return envelope('Switching to draft — big 12 by 12 blocks.', { v: 1, type: 'grid', preset: 'draft' });
   }

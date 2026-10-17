@@ -132,7 +132,7 @@ export interface BuildCommand {
   /** save / load: layout name */
   name?: string;
   /** grid: which block-size preset to switch to */
-  preset?: GridPresetId;
+  preset?: GridPresetId | 'finer' | 'coarser';
   message?: string;
   ts?: number;
 }
@@ -278,8 +278,8 @@ export function sanitizeCommand(raw: unknown): BuildCommand | null {
   if (typeof raw.ts === 'number') cmd.ts = raw.ts;
   if (type === 'grid') {
     const p = raw.preset;
-    if (typeof p === 'string' && (GRID_PRESET_IDS as readonly string[]).includes(p)) {
-      cmd.preset = p as GridPresetId;
+    if (typeof p === 'string' && ([...GRID_PRESET_IDS, 'finer', 'coarser'] as readonly string[]).includes(p)) {
+      cmd.preset = p as GridPresetId | 'finer' | 'coarser';
     }
     // grid without preset = cycle to next
   }

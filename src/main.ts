@@ -121,12 +121,53 @@ function start(): void {
 
   // ------------------------------------------------------------- persistence
   const SAVE_KEY = 'naga-atelier:world:v1';
+  // After a block-size change the build comes along: re-centre it so as much as possible fits.
+  let regridNote = '';
   try {
     const saved = localStorage.getItem(SAVE_KEY);
-    if (saved && !QUERY.has('fresh')) model.load(JSON.parse(saved));
+    if (saved && !QUERY.has('fresh')) {
+      const data = JSON.parse(saved) as { cells?: Array<[string, unknown]> };
+      const total = data.cells?.length ?? 0;
+      if (QUERY.has('regrid') && data.cells?.length) {
+        const ps = data.cells.map(([k]) => k.split(',').map(Number));
+        const mid = (i: number) => Math.round((Math.min(...ps.map((p) => p[i])) + Math.max(...ps.map((p) => p[i]))) / 2);
+        const [dx, dz] = [-mid(0), -mid(2)];
+        const y0 = Math.min(...ps.map((p) => p[1]));
+        data.cells = data.cells.map(([, c], i) => [`${ps[i][0] + dx},${ps[i][1] - y0},${ps[i][2] + dz}`, c]);
+      }
+      model.load(data);
+      if (QUERY.has('regrid')) {
+        const lost = total - model.size;
+        regridNote = total ? (lost > 0 ? ` I kept your build, but ${lost} block${lost === 1 ? '' : 's'} didn't fit. Say “load before grid change” on a bigger grid to get everything back.` : ' Your build came along.') : '';
+      }
+    }
   } catch {
     /* ignore */
   }
+  if (QUERY.has('regrid')) {
+    const u = new URL(location.href);
+    u.searchParams.delete('regrid');
+    history.replaceState(null, '', u.toString());
+  }
+  /** Save now and reload on another block size, keeping the build. */
+  const switchGrid = (id: string) => {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(model.toJSON()));
+      // safety copy, in case the new grid is too small for everything
+      if (model.size) {
+        const saves = JSON.parse(localStorage.getItem('naga-atelier:saves:v1') ?? '{}') ?? {};
+        saves['before grid change'] = model.toJSON();
+        localStorage.setItem('naga-atelier:saves:v1', JSON.stringify(saves));
+      }
+    } catch {
+      /* ignore */
+    }
+    const url = new URL(location.href);
+    url.searchParams.set('grid', id);
+    url.searchParams.delete('fresh');
+    url.searchParams.set('regrid', '1');
+    location.assign(url.toString());
+  };
   let saveTimer = 0;
   model.on((e) => {
     if (e.source === 'silent') return; // mid-carry states are not saved
@@ -227,15 +268,15 @@ function start(): void {
       return { ok: true, speech: 'Saved your desk as HTML.' };
     }
     if (cmd.type === 'grid') {
-      const next = cmd.preset ? applyGridPreset(cmd.preset) : nextGridPreset();
+      const i = GRID_PRESETS.findIndex((p) => p.id === GRID_PRESET_ID);
+      const rel = cmd.preset === 'finer' ? GRID_PRESETS[Math.min(GRID_PRESETS.length - 1, i + 1)] : cmd.preset === 'coarser' ? GRID_PRESETS[Math.max(0, i - 1)] : null;
+      if (rel && rel.id === GRID_PRESET_ID) return { ok: false, speech: cmd.preset === 'finer' ? 'This is already the finest grid.' : 'This is already the biggest block size.' };
+      const next = rel ? applyGridPreset(rel.id) : cmd.preset ? applyGridPreset(cmd.preset) : nextGridPreset();
       sfx.play('chime');
-      // Block geometry / desk size are built at session start — reload cleanly.
-      const url = new URL(location.href);
-      url.searchParams.set('grid', next.id);
-      url.searchParams.set('fresh', '1');
-      say(`${next.label}. Clearing the desk and reloading…`);
-      setTimeout(() => location.assign(url.toString()), 700);
-      return { ok: true, speech: next.blurb };
+      // Block geometry / desk size are built at session start: reload, and the build comes along.
+      const line = `${next.label}. Bringing your build along…`;
+      setTimeout(() => switchGrid(next.id), 900);
+      return { ok: true, speech: line, answer: true };
     }
     const res = executeCommand(model, cmd);
     const now = performance.now();
@@ -263,8 +304,25 @@ function start(): void {
     return res;
   };
 
+  // When the desk fills up, Naga offers a finer grid; "yes" accepts within 25 s.
+  let roomOffer: { id: string; until: number } | null = null;
+  const offerMoreRoom = (why: string | undefined, speech: string): string => {
+    if (!why || !/(no room|too full|only room|partly fits)/i.test(why)) return speech;
+    const i = GRID_PRESETS.findIndex((p) => p.id === GRID_PRESET_ID);
+    const next = GRID_PRESETS[i + 1];
+    if (!next) return speech;
+    roomOffer = { id: next.id, until: performance.now() + 25000 };
+    return `${speech} Want more room? Say yes and I'll switch to ${next.label.split(' ·')[0]} — your build comes along.`;
+  };
   const handleEnvelope = (env: AgentEnvelope) => {
     if (env.transcript) naga.caption.heard(env.transcript);
+    if (roomOffer && performance.now() < roomOffer.until && env.transcript && /^\s*(yes|yeah|yep|yup|sure|ok(ay)?|do it|please|go ahead|yes please)\b/i.test(env.transcript)) {
+      const id = roomOffer.id;
+      roomOffer = null;
+      apply({ v: 1, type: 'grid', preset: id as never });
+      say('Switching — your build comes along.');
+      return;
+    }
     let speech = env.speech;
     const b = env.build;
     // Tetris mode: game commands, and in-game "rotate / move left / drop" go to the game.
@@ -291,6 +349,7 @@ function start(): void {
         const res = apply(env.build);
         if (res.speech && (!res.ok || res.answer)) speech = res.speech;
         else if (res.speech) speech = `${speech} ${res.speech}`;
+        speech = offerMoreRoom(res.speech, speech);
       }
     }
     say(speech, speech === env.speech ? env.audio : null);
@@ -371,6 +430,10 @@ function start(): void {
         downloadWorld(model);
         sfx.play('chime');
         say('Saved your desk as HTML.');
+        break;
+      case 'clear':
+        interaction.cancelAll();
+        if (apply({ v: 1, type: 'clear' }).ok) say(model.canUndo() ? 'Desk cleared. Tap UNDO to bring it back.' : 'The desk is already clear.');
         break;
       case 'grid':
         interaction.cancelAll();
@@ -528,6 +591,7 @@ function start(): void {
     pad.setState([`depth${d}`], d === 1 ? ['away', 'closer'] : []);
   }
 
+  if (regridNote) setTimeout(() => say(`${GRID_PRESETS.find((p) => p.id === GRID_PRESET_ID)?.label ?? 'New grid'}.${regridNote}`), 1200);
   onboarding = new Onboarding({
     say: (t) => say(t),
     hint: (t) => naga.caption.setHint(t),
@@ -560,12 +624,7 @@ function start(): void {
         b.type = 'button';
         b.className = p.id === GRID_PRESET_ID ? 'active' : '';
         b.innerHTML = `${p.label}<small>${p.blurb}</small>`;
-        b.addEventListener('click', () => {
-          const url = new URL(location.href);
-          url.searchParams.set('grid', p.id);
-          url.searchParams.set('fresh', '1');
-          location.assign(url.toString());
-        });
+        b.addEventListener('click', () => switchGrid(p.id));
         holder.appendChild(b);
       }
     }

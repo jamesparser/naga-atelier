@@ -25,6 +25,7 @@ export type DockAction =
   | 'spin' | 'flip' | 'tilt' | 'drop' | 'pause' | 'exit' | 'depth'
   // Sling mode
   | 'retry' | 'next' | 'turnL' | 'turnR' | 'zoom'
+  | 'clear'
   // arcade games
   | 'start' | 'fire' | 'totop' | 'flap' | 'jump'
   // mode bar + arcade picker
@@ -37,7 +38,8 @@ export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
   redo: ['REDO', 'Redo'],
   magic: ['SURPRISE', 'Build a surprise shape'],
   export: ['SAVE', 'Save your desk as a web page'],
-  grid: ['BLOCK SIZE', 'Change block size (clears desk)'],
+  grid: ['BLOCK SIZE', 'Change block size (your build comes along)'],
+  clear: ['CLEAR', 'Clear the desk (UNDO brings it back)'],
   recenter: ['RECENTER', 'Move the desk in front of you'],
   game: ['TETRIS', 'Play 3D Tetris'],
   sling: ['ANGRY SLING', 'Play Angry Sling'],
@@ -81,6 +83,7 @@ export const BUILD_LAYOUT: Array<[DockAction, number]> = [
   ['magic', BIG],
   ['export', 0.018],
   ['grid', 0.018],
+  ['clear', 0.018],
   ['recenter', BIG],
 ];
 
@@ -482,6 +485,10 @@ function iconTexture(id: DockAction): CanvasTexture {
       g.closePath(); g.fill();
       break;
     }
+    case 'clear': // sweep: a broom over a cross
+      g.lineWidth = 10;
+      g.beginPath(); g.moveTo(34, 34); g.lineTo(94, 94); g.moveTo(94, 34); g.lineTo(34, 94); g.stroke();
+      break;
     case 'export':
       // Down-arrow into a tray = save/download
       g.beginPath(); g.moveTo(64, 18); g.lineTo(64, 78); g.stroke();

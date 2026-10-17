@@ -45,7 +45,18 @@ export function OPTIONS(req: Request): Response {
   return new Response(null, { status: 204, headers: cors(req) });
 }
 
-export function GET(req: Request): Response {
+export async function GET(req: Request): Promise<Response> {
+  // ?models=1 lists the model ids the configured LLM provider offers (ids only, no keys)
+  if (new URL(req.url).searchParams.has('models') && env.LLM_API_KEY) {
+    try {
+      const base = (env.LLM_BASE_URL || 'https://api.tokenfactory.nebius.com/v1').replace(/\/$/, '');
+      const r = await fetch(`${base}/models`, { headers: { authorization: `Bearer ${env.LLM_API_KEY}` }, signal: AbortSignal.timeout(8000) });
+      const j = (await r.json()) as { data?: Array<{ id: string }> };
+      return json({ models: (j.data ?? []).map((m) => m.id).slice(0, 200) }, 200, req);
+    } catch (e) {
+      return json({ error: String((e as Error).message).slice(0, 80) }, 502, req);
+    }
+  }
   return json(
     {
       ok: true,
@@ -54,6 +65,7 @@ export function GET(req: Request): Response {
       llm: !!env.LLM_API_KEY,
       tts: !!env.TTS_BASE_URL,
       llmModel: env.LLM_MODEL || null,
+      sculptModel: env.SCULPT_MODEL || null,
       llmBase: env.LLM_BASE_URL || 'https://api.tokenfactory.nebius.com/v1',
     },
     200,
