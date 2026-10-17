@@ -14,7 +14,7 @@ const env = process.env as unknown as AgentEnv & { ALLOWED_ORIGINS?: string };
 const MAX_AUDIO = 2_000_000;
 const MAX_TEXT = 300;
 // TEMPORARY: lets us compare sculpt quality across a few models; remove after choosing.
-const TRIAL_MODELS = ['Qwen/Qwen3-235B-A22B-Instruct-2507', 'deepseek-ai/DeepSeek-V4-Flash-0731', 'zai-org/GLM-5.3-Flash', 'openai/gpt-oss-120b', 'moonshotai/Kimi-K2.6', 'nvidia/nemotron-3-super-120b-a12b', 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B'];
+const TRIAL_MODELS = ['Qwen/Qwen3-235B-A22B-Instruct-2507', 'deepseek-ai/DeepSeek-V4-Flash-0731', 'zai-org/GLM-5.3-Flash', 'openai/gpt-oss-120b', 'moonshotai/Kimi-K2.6', 'nvidia/nemotron-3-super-120b-a12b', 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B', 'deepseek-ai/DeepSeek-V4-Pro', 'zai-org/GLM-5.3', 'Qwen/Qwen3.5-397B-A17B'];
 
 // Best-effort per-instance rate limit: 30 requests / minute / IP.
 const hits = new Map<string, number[]>();

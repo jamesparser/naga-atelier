@@ -98,7 +98,7 @@ export function extractJson(text: string): unknown {
   return best;
 }
 
-export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000, scene = '', model?: string): Promise<AgentEnvelope | null> {
+export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000, scene = '', model?: string, maxTokens = 3000): Promise<AgentEnvelope | null> {
   if (!env.LLM_API_KEY) return null;
   const base = (env.LLM_BASE_URL || 'https://api.tokenfactory.nebius.com/v1').replace(/\/$/, '');
   const res = await fetch(`${base}/chat/completions`, {
@@ -108,7 +108,7 @@ export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000, sce
       model: model || env.LLM_MODEL || 'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B',
       temperature: 0.2,
       // Nemotron reasoning consumes completion budget before content; 400 leaves content empty.
-      max_tokens: 1800,
+      max_tokens: maxTokens,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: scene ? `On the desk now: ${scene}\nUser says: ${text}` : text },
@@ -143,7 +143,7 @@ export async function decide(env: AgentEnv, text: string, scene = ''): Promise<A
   try {
     // open-ended build requests ("build me a dragon") go to the sculpt model when one is set
     const wantsMaking = !rules?.build && /\b(build|make|create|sculpt|draw|construct|give me|i want|can you do)\b/i.test(text);
-    const llm = await askLLM(env, text, 20000, scene, wantsMaking ? env.SCULPT_MODEL : undefined);
+    const llm = await askLLM(env, text, wantsMaking ? 26000 : 20000, scene, wantsMaking ? env.SCULPT_MODEL : undefined, wantsMaking ? 7000 : 3000);
     if (llm) {
       if (!llm.build && rules?.build) return done({ ...rules, speech: llm.speech || rules.speech });
       return done(llm);
