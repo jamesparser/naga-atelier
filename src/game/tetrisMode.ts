@@ -105,6 +105,8 @@ export class TetrisMode {
   depth = 1;
   private music = new SynthMusic();
   private neon = neonMaterial();
+  /** landed blocks: same neon look, dimmed so the falling piece stands out */
+  private boardNeon = this.neon.clone();
   active = false;
 
   constructor(private deskRoot: Object3D, _shadows: boolean, private host: TetrisHost) {
@@ -115,7 +117,7 @@ export class TetrisMode {
     this.well.scale.setScalar(this.s);
     this.root.add(this.well);
     // Neon look: glowing-rim glass cubes that share one hue-cycling material.
-    this.boardRenderer = new VoxelRenderer(this.boardModel, this.well, false, this.neon, 800);
+    this.boardRenderer = new VoxelRenderer(this.boardModel, this.well, false, this.boardNeon, 800);
     this.pieceMesh = new CarryMesh(this.well, false, this.neon, 8);
     this.ghost = new GhostMesh(this.well);
     this.sparkles = new Sparkles(this.well);
@@ -571,6 +573,8 @@ export class TetrisMode {
     this.frameMat.color.copy(this.stage.tint);
     if (danger) this.frameMat.color.lerp(new Color(1, 0.2, 0.25), 0.5 + 0.5 * Math.sin(now / 110));
     this.neon.color.setRGB(1, 1, 1).lerp(this.stage.tint, 0.28).lerp(new Color(1, 1, 1), Math.min(1, this.stage.flashLevel));
+    // placed blocks sit at ~55% brightness (they still flash with line clears)
+    this.boardNeon.color.copy(this.neon.color).multiplyScalar(0.55 + 0.45 * Math.min(1, this.stage.flashLevel));
 
     this.sparkles.update(dt);
     this.drawPanel();
