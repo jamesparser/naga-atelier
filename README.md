@@ -27,8 +27,8 @@ Built for the Meta VR Start Developer Competition 2026 (Productivity track, New 
 |---|---|
 | Pinch a block and move | Carries its whole part (roof, walls, tower…), snaps to a 4 cm grid on release, settles under gravity |
 | Pinch a block and hold still (~0.8 s) | Pops that single block free from its part |
-| Quick pinch-tap on a block | Paints it with the active colour |
-| Quick pinch-tap on empty desk | Places a block (it stacks onto whatever is below) |
+| Quick pinch-tap on a block | Paints it with the active colour; tap a block that's *already* that colour to grow a new block out of the face you tapped (build sideways and up) |
+| Pinch in empty space | A see-through cube shows where the block will go; move to aim, open your fingers to place it. Blocks **stick to any neighbour** (side, below or above), so doorways, arches and overhangs work; a block touching nothing drops onto what's below |
 | Release over the red bin | Deletes what you are carrying |
 | Invalid drop (out of bounds, blocked) | Springs back with an audio cue |
 | Poke (or pinch) a dock button | Mic · Undo · Redo · 8 colours · ★ draft a blueprint · Re-centre desk |

@@ -88,3 +88,10 @@ button.ghost.ok { border-color: var(--accent); color: var(--accent); }
 @media (pointer: coarse) { .pad-btn kbd, .pad-mini kbd { display: none; } }
 .pad-mini.selected, .pad-btn.selected { border-color: var(--gold); color: var(--gold); background: rgba(255, 209, 102, 0.14); }
 .pad-mini[data-id^="depth"] { padding: 5px 8px; }
+
+/* type-to-Naga box (desktop / phone, build mode only) */
+#talk { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); width: min(620px, calc(100% - 16px)); display: none; gap: 8px; z-index: 5; }
+#talk.show { display: flex; }
+#talk input { flex: 1; min-width: 0; padding: 11px 14px; border-radius: 12px; border: 1px solid rgba(127, 216, 255, 0.35); background: rgba(10, 18, 28, 0.86); color: #eafcff; font: 500 15px system-ui, sans-serif; }
+#talk input::placeholder { color: #8aa0b4; }
+#talk button { padding: 0 16px; border-radius: 12px; border: 0; background: #58d6c8; color: #0b1a1f; font: 700 15px system-ui, sans-serif; cursor: pointer; }

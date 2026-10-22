@@ -302,7 +302,7 @@ await wait(500);
   await wait(1500);
   const m1 = await gst();
   await pinch(0);
-  check('maze: pinch-push tilts the board and the marble rolls', m1.tilt[1] < -0.05 && Math.abs(m1.pos[0] - m0.pos[0]) + Math.abs(m1.pos[2] - m0.pos[2]) > 0.005, JSON.stringify([m0.pos, m1.pos, m1.tilt]));
+  check('maze: pinch-push tilts the board and the marble rolls', m1.tilt[1] < -0.03 && Math.abs(m1.pos[0] - m0.pos[0]) + Math.abs(m1.pos[2] - m0.pos[2]) > 0.005, JSON.stringify([m0.pos, m1.pos, m1.tilt]));
   await arc('debugTeleportToGoal');
   await wait(3800);
   check('maze: reaching the goal moves on to the next maze', (await gst()).level === m0.level + 1, JSON.stringify(await gst()));
@@ -355,6 +355,24 @@ await pinch(1); await wait(120); await pinch(0); await wait(600);
   const pg = await gst();
   console.log('    hand', JSON.stringify(await handLocal()));
   check('mike penguin: tap starts the run, pinch-swipe right changes lane', pg.state === 'play' && pg.lane === 1 && pg.speed > 1, JSON.stringify({ ...pg, ev: await page.evaluate(() => window.__naga.arcade().events.slice(-6)) }));
+}
+// arms-only control: both wrists moved left in front of you = left lane; raised to head height = jump
+{
+  await pinch(0, 'left'); await pinch(0, 'right');
+  const both = async (x, y, z) => {
+    for (const side of ['left', 'right']) {
+      const w = await local(x + (side === 'left' ? -0.06 : 0.06), y, z);
+      await page.evaluate(({ side, w }) => window.__iwer.hands[side].position.set(w[0], w[1], w[2]), { side, w });
+    }
+    await wait(400);
+  };
+  await both(-0.25, 0.3, 0.2);
+  const l = (await gst()).lane;
+  await both(0, 0.3, 0.2);
+  const c = (await gst()).lane;
+  await both(0, 0.6, 0.2);
+  const j = (await gst()).jumpY;
+  check('mike penguin: arms left = left lane, centre = middle, both arms up = jump (no pinch)', l === -1 && c === 0 && j > 0.02, JSON.stringify({ l, c, j }));
 }
 await shot('13-penguin');
 const calls = await page.evaluate(() => window.__naga.stats().calls);

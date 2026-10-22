@@ -84,6 +84,9 @@ export class MikePenguin extends GameBase {
   private eye = new Vector3();
   private gest = new Map<number, { x: number; y: number; t: number; moved: boolean }>();
   private stickArmed = true;
+  /** body steering: arms left / centre / right pick the lane, both arms up = jump */
+  private bodyLane = 0;
+  private jumpArmed = true;
   private tmpM = new Matrix4();
   private tmpQ = new Quaternion();
   private scrollZ = 0;
@@ -159,7 +162,7 @@ export class MikePenguin extends GameBase {
 
   protected start(): void {
     this.reset();
-    this.host.say('Mike Penguin! Swipe or use the arrows to change lane, pinch or Space to jump. Reach the flag in time!');
+    this.host.say('Mike Penguin! Lean your arms left or right to change lane, raise both arms to jump. Reach the flag in time!');
   }
 
   private reset(): void {
@@ -293,6 +296,7 @@ export class MikePenguin extends GameBase {
       }
     }
     this.eyeLocal(this.eye);
+    this.bodySteer(frames);
     this.stateT += dt;
 
     // --- simulation -----------------------------------------------------------------------
@@ -381,6 +385,39 @@ export class MikePenguin extends GameBase {
     const toFlag = Math.max(0, this.stage * STAGE_M - this.dist);
     this.panel('MIKE PENGUIN', [['TIME', String(Math.ceil(this.timeLeft))], ['FLAG IN', `${Math.ceil(toFlag)} m`], ['FISH', String(this.fish)], ['SCORE', String(this.score)]],
       this.state === 'ready' ? 'JUMP TO START' : this.state === 'over' ? 'TIME UP! JUMP TO RETRY' : this.state === 'flag' ? `FLAG ${this.stage}!` : this.state === 'paused' ? 'PAUSED' : `STAGE ${this.stage} · BEST ${Math.max(this.best, this.score)}`);
+  }
+
+  /**
+   * No pinching needed: hold your arms out in front of you and move them together.
+   * Their average left/right position picks the lane; raising them to head height jumps.
+   * Hands resting low (on the desk / in your lap) don't steer.
+   */
+  private bodySteer(frames: PointerFrame[]): void {
+    const arms = frames
+      .filter((f) => f.p.kind !== 'mouse' && f.p.wrist)
+      .map((f) => this.deskRoot.worldToLocal(f.p.wrist!.clone()))
+      .filter((w) => w.y > this.eye.y - 0.42); // raised in front of you, not resting on the desk
+    if (!arms.length) return;
+    const x = arms.reduce((a, w) => a + w.x, 0) / arms.length - this.eye.x;
+    // zones with hysteresis so the lane doesn't flicker at the borders
+    const enter = 0.11, leave = 0.07;
+    let lane = this.bodyLane;
+    if (x > enter) lane = 1;
+    else if (x < -enter) lane = -1;
+    else if (Math.abs(x) < leave) lane = 0;
+    if (lane !== this.bodyLane) {
+      this.bodyLane = lane;
+      if (this.state === 'play' && lane !== this.lane) {
+        this.lane = lane;
+        sfx.play('whoosh');
+      }
+    }
+    // jump: every tracked arm up at head height (one arm counts if only one is tracked)
+    const allUp = arms.every((w) => w.y > this.eye.y - 0.02);
+    if (allUp && this.jumpArmed) {
+      this.jumpArmed = false;
+      this.jump();
+    } else if (arms.every((w) => w.y < this.eye.y - 0.12)) this.jumpArmed = true;
   }
 
   private spawnRow(at: number): void {

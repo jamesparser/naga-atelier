@@ -161,6 +161,9 @@ export class VoxelRenderer {
     mesh.count = this.indexKeys.length;
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    // bounds are cached for raycasts: drop them so mouse clicks find newly added blocks
+    mesh.boundingSphere = null;
+    mesh.boundingBox = null;
     this.hoverDirty = false;
   }
 }

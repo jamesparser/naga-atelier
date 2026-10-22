@@ -35,7 +35,9 @@ export class Speaker {
     if (this.muted || !text) return;
     this.stop();
     const ctx = this.getCtx();
-    if (audio && ctx) {
+    // browsers start audio muted until a click; make sure it's running before Naga talks
+    if (ctx && ctx.state !== 'running') await ctx.resume().catch(() => {});
+    if (audio && ctx && ctx.state === 'running') {
       try {
         const bytes = Uint8Array.from(atob(audio.b64), (c) => c.charCodeAt(0));
         const decoded = await ctx.decodeAudioData(bytes.buffer);

@@ -367,7 +367,7 @@ export const PENGUIN_PAD: PadLayout = {
   help: [
     { head: 'Keyboard', lines: ['← → change lane · Space or ↑ jump · hold ↓ slow down', 'N new game · P pause · Esc back'] },
     { head: 'Mouse or touch', lines: ['Tap the left / right side to change lane, swipe up or tap the middle to jump'] },
-    { head: 'Quest — hands', lines: ['Pinch and swipe left / right to change lane', 'Quick pinch (or lift your hand) to jump'] },
+    { head: 'Quest — hands', lines: ['No pinching needed: hold your arms out and move them left / centre / right to pick a lane', 'Raise both arms to head height to jump', 'Pinch-swipes and quick pinches work too'] },
     { head: 'Quest — controllers', lines: ['Thumbstick left / right changes lane', 'Trigger or A/X jumps · pull stick back to slow'] },
   ],
 };

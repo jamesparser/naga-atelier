@@ -405,6 +405,8 @@ function start(): void {
   };
 
   const onMic = async () => {
+    sfx.unlock(); // the mic press is a user gesture: unlock audio so Naga can answer out loud
+    sfx.resume();
     if (voice.listening) {
       voice.stop();
       return;
@@ -436,7 +438,7 @@ function start(): void {
     naga.setMood('idle');
     if (r.reason === 'mic_denied' || r.reason === 'not-allowed') say('I need microphone access to hear you.');
     else if (r.reason === 'no_stt') say("Voice isn't available here — tap the star or use your hands.");
-    else if (r.reason !== 'stopped') say("I didn't catch that. Tap the mic and try again.");
+    else if (r.reason !== 'stopped') say("I didn't catch that. Tap the mic and try again — or type to me below.");
   };
 
   let magicIndex = 0;
@@ -615,6 +617,20 @@ function start(): void {
     else currentArcade()?.action(id);
   });
   const seenHelp = new Set<string>();
+  // type-to-Naga box: desktop / phone in build mode (the headset uses voice)
+  const talk = document.getElementById('talk') as HTMLFormElement | null;
+  const talkInput = document.getElementById('talk-input') as HTMLInputElement | null;
+  talk?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = talkInput?.value.trim();
+    if (!text) return;
+    sfx.unlock();
+    sfx.resume();
+    talkInput!.value = '';
+    void runText(text);
+  });
+  const syncTalk = () => talk?.classList.toggle('show', !session && mode === 'build' && landing.classList.contains('hidden'));
+  setInterval(syncTalk, 500);
   function showLegend(m: Mode): void {
     const layout = session ? null : m === 'game' ? TETRIS_PAD : m === 'sling' ? SLING_PAD : m === 'arcade' ? ARCADE_PAD : arcadeGame(m)?.pad ?? null;
     let first = false;

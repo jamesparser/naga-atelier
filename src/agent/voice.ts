@@ -66,6 +66,9 @@ export class VoiceInput {
     }
     this.listening = true;
     try {
+      // Our server speech recognition works in every browser (including Quest and Chromium forks
+      // whose built-in recognition silently fails), so it goes first; the browser's own is a backup.
+      if (useServer && VoiceInput.recordingAvailable()) return await this.record(audioCtx);
       if (this.preferBrowserStt && VoiceInput.browserSttAvailable()) {
         const r = await this.listenBrowser();
         if (r.kind !== 'none' || !useServer || !VoiceInput.recordingAvailable()) return r;

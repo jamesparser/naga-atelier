@@ -11,7 +11,7 @@
  * Hands always win: agent commands cancel nothing the user is holding until it is dropped.
  */
 import { Vector3, type Object3D } from 'three';
-import { CARRY_LIFT, DRAG_THRESHOLD, GRID_Y, HOLD_DETACH_MS, grabRadius } from '../config.js';
+import { CARRY_LIFT, CELL, DRAG_THRESHOLD, GRID_Y, HOLD_DETACH_MS, grabRadius } from '../config.js';
 import { sfx } from '../audio/sfx.js';
 import { CarryMesh, GhostMesh, cellAt, cellCenter, type VoxelRenderer } from '../blocks/voxelRenderer.js';
 import { groupOf, inBounds, key, parseKey, type Cell, type CellChange, type VoxelModel } from '../blocks/voxelModel.js';
@@ -54,6 +54,9 @@ export type InteractionEvent =
   | { type: 'detached' }
   | { type: 'trashTap' }
   | { type: 'dock'; action: DockAction };
+
+/** the six face neighbours of a cell */
+const NEIGHBOURS: V3i[] = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
 export class Interaction {
   private states = new Map<number, State>();
@@ -148,6 +151,20 @@ export class Interaction {
             this.states.set(p.id, { k: 'ignore' }); // block vanished (agent/undo)
             break;
           }
+          if (!st.hit) {
+            // pinch in empty space: a see-through cube shows where the block will go; move to aim,
+            // open your fingers to place it there
+            const ghost = this.meshesFor(p.id).ghost;
+            const plan = this.enabled ? this.planTap(null, st.firm) : null;
+            if (plan && 'place' in plan) ghost.show([parseKey(plan.place)], true);
+            else ghost.hide();
+            if (up) {
+              ghost.hide();
+              if (this.enabled) this.tap(null, st.firm);
+              this.states.set(p.id, { k: 'idle' });
+            }
+            break;
+          }
           if (up) {
             if (moved < TAP_TOLERANCE && this.enabled) this.tap(st.hit, st.start);
             this.states.set(p.id, { k: 'idle' });
@@ -225,34 +242,64 @@ export class Interaction {
     return this.model.keysInGroup(cell.cl);
   }
 
+  /** What a tap at `at` would do: paint a block, place a new one (and where), or explain the bin. */
+  private planTap(hit: string | null, at: Vector3): { paint: string } | { place: string } | { bin: true } | null {
+    if (Math.hypot(at.x - TRASH_POS.x, at.z - TRASH_POS.z) < TRASH_RADIUS + 0.02) return { bin: true };
+    const [x, cy, z] = cellAt(at);
+    // Paint when the pinch is in (or right at the surface of) a block; otherwise place a new
+    // block exactly in the empty cell under your fingers, so you can build beside and between blocks.
+    const hitCentre = hit ? cellCenter(...parseKey(hit), new Vector3()) : null;
+    if (hit && (this.model.cells.has(key(x, cy, z)) || hitCentre!.distanceTo(at) < CELL * 0.6)) return { paint: hit };
+    if (at.y < -0.03 || cy >= GRID_Y) return null;
+    let y = Math.max(0, cy);
+    if (!inBounds(x, y, z)) return null;
+    // occupied (pinch inside a column): stack on top of it
+    while (y < GRID_Y && this.model.cells.has(key(x, y, z))) y++;
+    // empty: it stays where you put it if it touches any block; otherwise it drops onto what's below
+    const touches = (yy: number) => yy === 0 || NEIGHBOURS.some(([ox, oy, oz]) => this.model.cells.has(key(x + ox, yy + oy, z + oz)));
+    while (y > 0 && !touches(y)) y--;
+    if (y >= GRID_Y) return null;
+    return { place: key(x, y, z) };
+  }
+
   private tap(hit: string | null, at: Vector3): void {
+    const plan = this.planTap(hit, at);
+    if (!plan) return;
+    if ('bin' in plan) {
+      this.emit({ type: 'trashTap' }); // tapping the bin itself: explain how it works
+      return;
+    }
     const color = this.dock.swatch;
-    if (hit) {
-      const cell = this.model.cells.get(hit);
-      if (!cell || cell.c === color) return;
-      this.model.commit('paint', this.model.diff([[hit, { ...cell, c: color }]]));
+    if ('paint' in plan) {
+      const cell = this.model.cells.get(plan.paint);
+      if (!cell) return;
+      if (cell.c === color) {
+        // already this colour: grow a new block out of the face you tapped (build sideways/up)
+        const [bx, by, bz] = parseKey(plan.paint);
+        const off = at.clone().sub(cellCenter(bx, by, bz, new Vector3()));
+        const axis = Math.abs(off.x) >= Math.abs(off.y) && Math.abs(off.x) >= Math.abs(off.z) ? 0 : Math.abs(off.y) >= Math.abs(off.z) ? 1 : 2;
+        const n: V3i = [0, 0, 0];
+        n[axis] = Math.sign(off.getComponent(axis)) || 1;
+        const k = key(bx + n[0], by + n[1], bz + n[2]);
+        if (!inBounds(bx + n[0], by + n[1], bz + n[2]) || this.model.cells.has(k) || by + n[1] < 0) return;
+        this.model.commit('place', this.model.diff([[k, { c: color, cl: null }]]));
+        this.renderer.animateSpawn([k], performance.now(), 0);
+        sfx.play('place');
+        this.emit({ type: 'placed' });
+        return;
+      }
+      this.model.commit('paint', this.model.diff([[plan.paint, { ...cell, c: color }]]));
       sfx.play('paint');
       this.emit({ type: 'painted' });
       return;
     }
-    if (Math.hypot(at.x - TRASH_POS.x, at.z - TRASH_POS.z) < TRASH_RADIUS + 0.02) {
-      // tapping the bin itself: explain how it works instead of doing nothing
-      this.emit({ type: 'trashTap' });
-      return;
-    }
-    if (at.y > 0.3 || at.y < -0.03) return;
-    let [x, y, z] = cellAt(at);
-    y = Math.max(0, y);
-    if (!inBounds(x, 0, z)) return;
-    while (y < GRID_Y && this.model.cells.has(key(x, y, z))) y++;
-    // Settle onto whatever is below so taps feel like stacking, not floating.
-    while (y > 0 && !this.model.cells.has(key(x, y - 1, z))) y--;
-    if (y >= GRID_Y) return;
-    this.model.commit('place', this.model.diff([[key(x, y, z), { c: color, cl: null }]]));
-    this.renderer.animateSpawn([key(x, y, z)], performance.now(), 0);
+    this.model.commit('place', this.model.diff([[plan.place, { c: color, cl: null }]]));
+    this.renderer.animateSpawn([plan.place], performance.now(), 0);
     sfx.play('place');
     this.emit({ type: 'placed' });
   }
+
+
 
   private meshesFor(id: number): { carry: CarryMesh; ghost: GhostMesh } {
     let m = this.meshes.get(id);
@@ -301,13 +348,17 @@ export class Interaction {
     return true;
   }
 
+  /** A carried piece stays put if any block touches it: below, beside or above (so lintels,
+   * arches and overhangs work). Only a piece touching nothing falls to the desk. */
   private supported(rel: Array<[V3i, Cell]>, anchor: V3i, d: V3i): boolean {
     const own = new Set(rel.map(([[x, y, z]]) => key(x, y, z)));
     for (const [[x, y, z]] of rel) {
-      const ny = anchor[1] + y + d[1];
+      const nx = anchor[0] + x + d[0], ny = anchor[1] + y + d[1], nz = anchor[2] + z + d[2];
       if (ny === 0) return true;
-      const below = key(anchor[0] + x + d[0], ny - 1, anchor[2] + z + d[2]);
-      if (this.model.cells.has(below) && !own.has(key(x, y - 1, z))) return true;
+      for (const [ox, oy, oz] of NEIGHBOURS) {
+        if (own.has(key(x + ox, y + oy, z + oz))) continue;
+        if (this.model.cells.has(key(nx + ox, ny + oy, nz + oz))) return true;
+      }
     }
     return false;
   }
