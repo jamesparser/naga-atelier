@@ -341,9 +341,9 @@ export const ARCADE_PAD: PadLayout = {
 
 export const FLAPBRO_PAD: PadLayout = {
   title: 'Flap Bro',
-  hint: 'You are the bird. Flap to rise, fall between flaps, and fly through the gaps.',
+  hint: 'Flap to rise, fall between flaps, and fly through the gaps. VIEW switches between comfort view and first person.',
   rows: [[{ id: 'flap', label: 'Flap', key: 'Space', tip: 'Flap (Space, click, tap)', wide: true }]],
-  extras: [NEW, PAUSE, HELP, BACK],
+  extras: [NEW, { id: 'view', label: 'View', key: 'V', tip: 'Comfort view (watch your bird) or first person (V)' }, PAUSE, HELP, BACK],
   help: [
     { head: 'Keyboard', lines: ['Space, ↑ or W flaps', 'N new game · P pause · Esc back'] },
     { head: 'Mouse or touch', lines: ['Click or tap anywhere on the game to flap'] },

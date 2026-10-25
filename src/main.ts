@@ -2,12 +2,17 @@
  * AgentAsia Voxel — entry point. Wires scene, hands, voxel world, agent and onboarding.
  */
 import {
+  CanvasTexture,
   Color,
   DirectionalLight,
   HemisphereLight,
+  Matrix4,
+  Mesh,
+  MeshBasicMaterial,
   PCFShadowMap,
   PerspectiveCamera,
   Plane,
+  PlaneGeometry,
   Quaternion,
   Ray,
   Raycaster,
@@ -516,6 +521,35 @@ function start(): void {
   type Mode = 'build' | 'game' | 'sling' | 'arcade' | ArcadeId;
   let mode: Mode = 'build';
   let lastMouseRay: Ray | null = null;
+  // Comfort vignette for first-person games: darkens the edge of your view while the world moves,
+  // which cuts the peripheral motion that causes VR sickness. Placed per eye at draw time (no lag).
+  let comfortTarget = 0;
+  let comfortLevel = 0;
+  const vignette = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const g = c.getContext('2d')!;
+    const grad = g.createRadialGradient(128, 128, 40, 128, 128, 128);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.45, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.8, 'rgba(0,0,0,0.85)');
+    grad.addColorStop(1, 'rgba(0,0,0,1)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 256, 256);
+    const tex = new CanvasTexture(c);
+    const mat = new MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
+    const m = new Mesh(new PlaneGeometry(0.62, 0.62), mat);
+    m.frustumCulled = false;
+    m.matrixAutoUpdate = false;
+    m.renderOrder = 999;
+    const off = new Matrix4().makeTranslation(0, 0, -0.2);
+    m.onBeforeRender = (_r, _s, cam) => {
+      m.matrixWorld.multiplyMatrices(cam.matrixWorld, off);
+    };
+    m.visible = false;
+    return m;
+  })();
+  scene.add(vignette);
   const eyeWorld = new Vector3();
   const gameHost = {
     say: (t: string) => say(t),
@@ -526,6 +560,9 @@ function start(): void {
     depthChanged: () => syncPadState(),
     eye: () => eyeWorld.setFromMatrixPosition((session ? renderer.xr.getCamera() : camera).matrixWorld),
     mouseRay: () => (session ? null : lastMouseRay),
+    comfort: (level: number) => {
+      comfortTarget = level;
+    },
   };
   // Arcade: a picker plus seven mini-games, each built the first time it is opened.
   const arcadeGames = new Map<string, GameBase>();
@@ -982,6 +1019,12 @@ function start(): void {
     else if (mode === 'sling') sling.update(hands.pointers, now, dt);
     else if (mode !== 'build') currentArcade()?.update(hands.pointers, now, dt);
     else interaction.update(hands.pointers, now);
+    {
+      const want = session && currentArcade()?.firstPerson ? comfortTarget : 0;
+      comfortLevel += (want - comfortLevel) * Math.min(1, dt * 4);
+      (vignette.material as MeshBasicMaterial).opacity = comfortLevel * 0.9;
+      vignette.visible = comfortLevel > 0.01;
+    }
     updateModeBar(now);
     while (pending.length && !interaction.busy) apply(pending.shift()!);
     voxels.update(now);

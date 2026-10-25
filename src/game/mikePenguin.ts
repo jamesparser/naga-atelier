@@ -38,6 +38,8 @@ const ROAD_DROP = 0.62; // road surface below your eyes
 const FAR = -40;
 const STAGE_M = 420;
 const STAGE_TIME = 40;
+/** fewer flakes streaming past = less peripheral motion (comfort) */
+const SNOW = 110;
 const JUMP_V = 2.6, G = -9;
 
 type ObKind = 'hole' | 'crack' | 'seal' | 'fish';
@@ -62,7 +64,7 @@ export class MikePenguin extends GameBase {
   private flippers: Mesh[] = [];
   private beak: Mesh;
   private snow: Points;
-  private snowPos = new Float32Array(300 * 3);
+  private snowPos = new Float32Array(SNOW * 3);
   private sparkles: Sparkles;
   private obs: Ob[] = [];
   private lane = 0;
@@ -85,7 +87,10 @@ export class MikePenguin extends GameBase {
   private gest = new Map<number, { x: number; y: number; t: number; moved: boolean }>();
   private stickArmed = true;
   /** body steering: arms left / centre / right pick the lane, both arms up = jump */
-  private bodyLane = 0;
+  private pendingZone = 0;
+  private appliedZone = 0;
+  private zoneSince = 0;
+  private calmSince = 0;
   private jumpArmed = true;
   private tmpM = new Matrix4();
   private tmpQ = new Quaternion();
@@ -128,10 +133,10 @@ export class MikePenguin extends GameBase {
     this.flag.add(banner);
     this.world.add(this.flag);
     // snowfall
-    for (let i = 0; i < 300; i++) this.resetSnow(i, true);
+    for (let i = 0; i < SNOW; i++) this.resetSnow(i, true);
     const sg = new BufferGeometry();
     sg.setAttribute('position', new BufferAttribute(this.snowPos, 3));
-    this.snow = new Points(sg, new PointsMaterial({ size: 0.035, map: dotTexture(), color: 0xffffff, transparent: true, depthWrite: false, blending: AdditiveBlending }));
+    this.snow = new Points(sg, new PointsMaterial({ size: 0.03, map: dotTexture(), color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false, blending: AdditiveBlending }));
     this.snow.frustumCulled = false;
     this.world.add(this.snow);
     // you: two flippers and a beak at the bottom of your view
@@ -210,6 +215,7 @@ export class MikePenguin extends GameBase {
 
   private step(d: number): void {
     if (this.go() || this.state !== 'play') return;
+    if (this.jumpY > 0.005) return; // lane changes only on the ground
     const n = Math.max(-1, Math.min(1, this.lane + d));
     if (n !== this.lane) {
       this.lane = n;
@@ -274,7 +280,7 @@ export class MikePenguin extends GameBase {
         g.y = f.local.y;
       } else if (g && p.pinching) {
         const dx = f.local.x - g.x;
-        if (Math.abs(dx) > 0.04) {
+        if (Math.abs(dx) > 0.07) {
           this.step(Math.sign(dx));
           g.x = f.local.x;
           g.moved = true;
@@ -372,10 +378,12 @@ export class MikePenguin extends GameBase {
     } else if (this.state === 'ready') {
       this.speed = 0;
     }
-    this.laneShown += (this.lane - this.laneShown) * Math.min(1, dt * 12);
-    const bob = this.state === 'play' && this.stumble <= 0 && this.jumpY === 0 ? Math.sin(this.dist * 5) * 0.012 : 0;
-    this.world.position.set(this.eye.x - this.laneShown * LANE, this.eye.y - ROAD_DROP - this.jumpY + bob, this.eye.z);
-    this.world.rotation.z = this.stumble > 0 ? Math.sin(this.stumble * 18) * 0.03 : (this.lane - this.laneShown) * 0.05;
+    // comfort: quick lane slides, no bobbing or tilting, a gentle half-height jump
+    this.laneShown += (this.lane - this.laneShown) * Math.min(1, dt * 20);
+    this.world.position.set(this.eye.x - this.laneShown * LANE, this.eye.y - ROAD_DROP - this.jumpY * 0.5, this.eye.z);
+    this.world.rotation.z = 0;
+    const lateral = Math.min(1, Math.abs(this.lane - this.laneShown) * 3);
+    this.host.comfort?.(this.state === 'play' ? Math.min(1, 0.35 + this.speed / 30 + lateral * 0.5 + (this.jumpY > 0 ? 0.25 : 0)) : 0.15);
     // skates on ice: hiss follows your speed
     sfx.loop('ice', this.state === 'play' && this.jumpY === 0 ? Math.min(0.2, this.speed / 50) : 0, 2500 + this.speed * 200); // soft skate hiss
     if (this.jumpY === 0 && this.jumpV === 0 && this.landed === false) { this.landed = true; sfx.play('thud'); }
@@ -393,31 +401,46 @@ export class MikePenguin extends GameBase {
    * Hands resting low (on the desk / in your lap) don't steer.
    */
   private bodySteer(frames: PointerFrame[]): void {
+    const now = performance.now();
+    // bare hands only: controllers steer with the thumbstick (their grips would fight it)
     const arms = frames
-      .filter((f) => f.p.kind !== 'mouse' && f.p.wrist)
+      .filter((f) => f.p.kind === 'hand' && f.p.wrist)
       .map((f) => this.deskRoot.worldToLocal(f.p.wrist!.clone()))
       .filter((w) => w.y > this.eye.y - 0.42); // raised in front of you, not resting on the desk
     if (!arms.length) return;
-    const x = arms.reduce((a, w) => a + w.x, 0) / arms.length - this.eye.x;
-    // zones with hysteresis so the lane doesn't flicker at the borders
-    const enter = 0.11, leave = 0.07;
-    let lane = this.bodyLane;
-    if (x > enter) lane = 1;
-    else if (x < -enter) lane = -1;
-    else if (Math.abs(x) < leave) lane = 0;
-    if (lane !== this.bodyLane) {
-      this.bodyLane = lane;
-      if (this.state === 'play' && lane !== this.lane) {
-        this.lane = lane;
-        sfx.play('whoosh');
-      }
-    }
     // jump: every tracked arm up at head height (one arm counts if only one is tracked)
     const allUp = arms.every((w) => w.y > this.eye.y - 0.02);
     if (allUp && this.jumpArmed) {
       this.jumpArmed = false;
       this.jump();
     } else if (arms.every((w) => w.y < this.eye.y - 0.12)) this.jumpArmed = true;
+    // lanes only on the ground, with arms out of the jump pose, and not right after landing
+    const x = arms.reduce((a, w) => a + w.x, 0) / arms.length - this.eye.x;
+    const zone = x > 0.16 ? 1 : x < -0.16 ? -1 : Math.abs(x) < 0.09 ? 0 : this.pendingZone;
+    const busy = this.jumpY > 0.005 || this.jumpV > 0 || arms.some((w) => w.y > this.eye.y - 0.12);
+    if (busy) {
+      this.calmSince = now;
+      this.appliedZone = zone; // whatever your arms do mid-jump never counts as a lane change
+      this.pendingZone = zone;
+      return;
+    }
+    if (now - this.calmSince < 300) {
+      this.appliedZone = zone; // settle after landing: re-sync without moving
+      this.pendingZone = zone;
+      return;
+    }
+    if (zone !== this.pendingZone) {
+      this.pendingZone = zone;
+      this.zoneSince = now;
+    }
+    // a lane change needs the arms to stay in the new zone for a moment (no twitchy flicks)
+    if (this.pendingZone !== this.appliedZone && now - this.zoneSince > 180) {
+      this.appliedZone = this.pendingZone;
+      if (this.state === 'play' && this.appliedZone !== this.lane) {
+        this.lane = this.appliedZone;
+        sfx.play('whoosh');
+      }
+    }
   }
 
   private spawnRow(at: number): void {
@@ -463,8 +486,9 @@ export class MikePenguin extends GameBase {
         this.tmpM.makeTranslation(x, 0.002, z);
         this.stripes.setMatrixAt(s++, this.tmpM);
       }
-      for (const x of [-(LANE * 1.5 + 0.45), LANE * 1.5 + 0.45]) {
-        this.tmpM.makeScale(1, 0.6 + 0.4 * Math.abs(Math.sin(z * 1.7)), 1).setPosition(x, 0.15, z);
+      // low, steady snowbanks a little further out: less flicker streaming past the corner of your eye
+      for (const x of [-(LANE * 1.5 + 0.7), LANE * 1.5 + 0.7]) {
+        this.tmpM.makeScale(1, 0.45, 1).setPosition(x, 0.11, z);
         this.banks.setMatrixAt(b++, this.tmpM);
       }
     }
@@ -474,7 +498,7 @@ export class MikePenguin extends GameBase {
     this.banks.instanceMatrix.needsUpdate = true;
     this.flag.position.z = -(this.stage * STAGE_M - this.dist);
     this.flag.visible = this.flag.position.z > FAR && this.flag.position.z < 3;
-    for (let i = 0; i < 300; i++) {
+    for (let i = 0; i < SNOW; i++) {
       this.snowPos[i * 3 + 1] -= dt * 0.4;
       this.snowPos[i * 3 + 2] += this.speed * dt;
       if (this.snowPos[i * 3 + 1] < 0 || this.snowPos[i * 3 + 2] > 1) this.resetSnow(i);

@@ -18,6 +18,8 @@ export interface GameHost {
   passthrough?(): boolean;
   /** viewer (head / desktop camera) position in world space */
   eye?(): Vector3;
+  /** comfort vignette strength 0..1 for first-person games (darkens the edges of your view) */
+  comfort?(level: number): void;
   /** latest desktop mouse ray in world space (null in the headset) */
   mouseRay?(): Ray | null;
 }

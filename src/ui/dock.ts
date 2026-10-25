@@ -27,7 +27,7 @@ export type DockAction =
   | 'retry' | 'next' | 'turnL' | 'turnR' | 'zoom'
   | 'clear' | 'board'
   // arcade games
-  | 'start' | 'fire' | 'totop' | 'flap' | 'jump'
+  | 'start' | 'fire' | 'totop' | 'flap' | 'jump' | 'view'
   // mode bar + arcade picker
   | 'build' | 'sling' | 'arcade' | 'swarm' | 'maze' | 'whack' | 'breakout' | 'tower' | 'flapbro' | 'penguin';
 
@@ -49,6 +49,7 @@ export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
   flapbro: ['FLAP BRO', 'Flap Bro: flap through the gaps'],
   penguin: ['MIKE PENGUIN', 'Mike Penguin: race across the ice'],
   flap: ['FLAP', 'Flap your wings'],
+  view: ['VIEW', 'Comfort view or first person'],
   jump: ['JUMP', 'Jump'],
   swarm: ['STAR SWARM', 'Play Star Swarm: space shooter'],
   maze: ['MARBLE MAZE', 'Play Marble Maze: tilt to roll'],
@@ -113,7 +114,7 @@ export const ARCADE_TILES: Array<[DockAction, number]> = [
   ['tower', 0.03], ['flapbro', 0.03], ['penguin', 0.03],
 ];
 export const ARCADE_LAYOUT: Array<[DockAction, number]> = [['exit', 0.024], ['mic', 0.024]];
-export const FLAPBRO_LAYOUT: Array<[DockAction, number]> = [['exit', 0.024], ['start', 0.024], ['flap', 0.034], ['pause', 0.024], ['mic', 0.024]];
+export const FLAPBRO_LAYOUT: Array<[DockAction, number]> = [['exit', 0.024], ['start', 0.024], ['flap', 0.034], ['view', 0.024], ['pause', 0.024], ['mic', 0.024]];
 export const PENGUIN_LAYOUT: Array<[DockAction, number]> = [['exit', 0.024], ['start', 0.024], ['jump', 0.034], ['pause', 0.024], ['mic', 0.024]];
 
 const G = 0.024;
@@ -589,6 +590,10 @@ function iconTexture(id: DockAction): CanvasTexture {
     case 'flapbro':
     case 'flap': // wing
       g.beginPath(); g.moveTo(20, 70); g.quadraticCurveTo(50, 20, 108, 34); g.quadraticCurveTo(84, 52, 96, 60); g.quadraticCurveTo(70, 66, 80, 80); g.quadraticCurveTo(50, 86, 20, 70); g.fill();
+      break;
+    case 'view': // an eye
+      g.beginPath(); g.ellipse(64, 64, 46, 26, 0, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.arc(64, 64, 13, 0, Math.PI * 2); g.fill();
       break;
     case 'penguin':
       g.beginPath(); g.ellipse(64, 70, 30, 40, 0, 0, Math.PI * 2); g.fill();

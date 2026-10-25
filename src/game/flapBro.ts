@@ -21,6 +21,7 @@ import {
   PointsMaterial,
   Shape,
   ShapeGeometry,
+  SphereGeometry,
   Vector3,
   DoubleSide,
   type Object3D,
@@ -41,6 +42,10 @@ const GAP = 1.1;
 const WALL_W = 2.4, WALL_D = 0.35, WALL_H = 3;
 const FLOOR = -1.25, CEIL = 1.25;
 const FAR = -18;
+/** comfort view: your bird flies this far ahead of you and the world is drawn at this vertical scale */
+const BIRD_AHEAD = 1.0;
+const COMFORT_Y = 0.3;
+const VIEW_KEY = 'naga-atelier:flapbro-view:v1';
 
 interface Wall {
   z: number;
@@ -69,6 +74,10 @@ export class FlapBro extends GameBase {
   private stateT = 0;
   private flapT = 9;
   private eye = new Vector3();
+  /** 'comfort' (default): you watch your bird just ahead and the world stays level. 'fp': you are the bird. */
+  private view: 'comfort' | 'fp' = 'comfort';
+  private bird = new Group();
+  private birdWings: Mesh[] = [];
   private lastY = new Map<number, number>();
   private tmpM = new Matrix4();
   private tmpC = new Color();
@@ -106,6 +115,29 @@ export class FlapBro extends GameBase {
       this.wings.push(w);
       this.root.add(w);
     }
+    // the bird you watch in comfort view (a round yellow bro with flapping wings)
+    const body = new Mesh(new SphereGeometry(0.035, 20, 14), new MeshStandardMaterial({ color: 0xffc94a, emissive: 0x4a3300, roughness: 0.5 }));
+    const belly = new Mesh(new SphereGeometry(0.026, 16, 12), new MeshStandardMaterial({ color: 0xfff3d6, roughness: 0.6 }));
+    belly.position.set(0, -0.01, 0.014);
+    const bb = new Mesh(new ConeGeometry(0.01, 0.024, 10).rotateX(-Math.PI / 2), new MeshStandardMaterial({ color: 0xff8a3d, emissive: 0x401800 }));
+    bb.position.set(0, 0.004, -0.04);
+    this.bird.add(body, belly, bb);
+    for (const side of [-1, 1]) {
+      const eyeW = new Mesh(new SphereGeometry(0.008, 10, 8), new MeshStandardMaterial({ color: 0xffffff }));
+      eyeW.position.set(side * 0.014, 0.014, -0.028);
+      this.bird.add(eyeW);
+      const w = new Mesh(wg, new MeshStandardMaterial({ color: 0xffb02e, emissive: 0x442800, side: DoubleSide, roughness: 0.6 }));
+      w.scale.set(side * 0.22, 0.22, 0.22);
+      w.position.set(side * 0.03, 0.005, 0);
+      this.birdWings.push(w);
+      this.bird.add(w);
+    }
+    this.root.add(this.bird);
+    try {
+      if (localStorage.getItem(VIEW_KEY) === 'fp') this.view = 'fp';
+    } catch {
+      /* ignore */
+    }
     const beak = new Mesh(new ConeGeometry(0.018, 0.05, 12).rotateX(-Math.PI / 2), new MeshStandardMaterial({ color: 0xff8a3d, emissive: 0x401800 }));
     beak.name = 'beak';
     this.root.add(beak);
@@ -132,7 +164,7 @@ export class FlapBro extends GameBase {
 
   protected start(): void {
     this.reset();
-    this.host.say(`${FLAPBRO_NAME}! You're the bird. Pinch, click or press Space to flap through the gaps.`);
+    this.host.say(`${FLAPBRO_NAME}! Pinch, click or press Space to flap through the gaps. VIEW switches to first person.`);
   }
 
   private reset(): void {
@@ -175,11 +207,21 @@ export class FlapBro extends GameBase {
         break;
       case 'exit': this.host.exit(); break;
       case 'mic': this.host.mic(); break;
+      case 'view':
+        this.view = this.view === 'comfort' ? 'fp' : 'comfort';
+        try {
+          localStorage.setItem(VIEW_KEY, this.view);
+        } catch {
+          /* ignore */
+        }
+        sfx.play('click');
+        this.host.say(this.view === 'fp' ? 'First person: you are the bird. Press VIEW again if it feels queasy.' : 'Comfort view: watch your bird just ahead.');
+        break;
     }
   }
 
   key(k: string): boolean {
-    const map: Record<string, string> = { ' ': 'flap', ArrowUp: 'flap', w: 'flap', Enter: 'flap', n: 'start', p: 'pause', Escape: 'exit' };
+    const map: Record<string, string> = { ' ': 'flap', ArrowUp: 'flap', w: 'flap', Enter: 'flap', n: 'start', p: 'pause', v: 'view', Escape: 'exit' };
     const a = map[k];
     if (!a) return false;
     this.action(a);
@@ -241,11 +283,20 @@ export class FlapBro extends GameBase {
     }
     // smooth what you see so a flap never jerks the world
     this.shown += (this.alt - this.shown) * Math.min(1, dt * 18);
-    this.world.position.set(this.eye.x, this.eye.y - this.shown, this.eye.z);
+    if (this.view === 'comfort') {
+      // the world stays level; it's drawn shorter so your bird's whole flight fits comfortably in view
+      this.world.position.set(this.eye.x, this.eye.y, this.eye.z - BIRD_AHEAD);
+      this.world.scale.set(1, COMFORT_Y, 1);
+      this.host.comfort?.(this.state === 'play' ? 0.2 : 0.05);
+    } else {
+      this.world.position.set(this.eye.x, this.eye.y - this.shown, this.eye.z);
+      this.world.scale.set(1, 1, 1);
+      this.host.comfort?.(this.state === 'play' ? Math.min(1, 0.45 + Math.abs(this.vAlt) * 0.2) : 0.15);
+    }
     if (this.state === 'play') {
       for (let i = 0; i < 240; i++) {
         this.cloudPos[i * 3 + 2] += this.speed * dt;
-        if (this.cloudPos[i * 3 + 2] > 1) this.resetCloud(i);
+        if (this.cloudPos[i * 3 + 2] > (this.view === 'comfort' ? 0.2 : 1)) this.resetCloud(i);
       }
       (this.clouds.geometry.attributes.position as BufferAttribute).needsUpdate = true;
     }
@@ -272,8 +323,10 @@ export class FlapBro extends GameBase {
 
   private draw(now: number): void {
     let n = 0;
+    const comfort = this.view === 'comfort';
     for (const w of this.walls) {
       if (w.z < FAR) continue;
+      if (comfort && w.z > 0.25) continue; // once past your bird, a wall vanishes instead of sweeping through you
       this.tmpC.setHSL((w.hue * 0.25 + 0.3) % 1, 0.65, 0.5);
       for (const top of [true, false]) {
         const y = top ? w.gap + GAP / 2 + WALL_H / 2 : w.gap - GAP / 2 - WALL_H / 2;
@@ -301,6 +354,17 @@ export class FlapBro extends GameBase {
     });
     const beak = this.root.getObjectByName('beak')!;
     beak.position.set(this.eye.x, this.eye.y - 0.13, this.eye.z - 0.26);
+    for (const w of this.wings) w.visible = !comfort;
+    beak.visible = !comfort;
+    this.bird.visible = comfort;
+    if (comfort) {
+      this.bird.position.set(this.eye.x, this.eye.y + this.shown * COMFORT_Y, this.eye.z - BIRD_AHEAD);
+      this.bird.rotation.x = Math.max(-0.5, Math.min(0.5, -this.vAlt * 0.15));
+      this.birdWings.forEach((w, i) => {
+        const side = i === 0 ? -1 : 1;
+        w.rotation.set(0, 0, side * (-0.3 + beat * 1.2 + idle));
+      });
+    }
   }
 
   /** test hooks */
