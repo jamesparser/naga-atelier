@@ -28,7 +28,7 @@ export function createTowerWorld(): CANNON.World {
   const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
   world.broadphase = new CANNON.SAPBroadphase(world);
   world.allowSleep = true;
-  (world.solver as CANNON.GSSolver).iterations = 25;
+  (world.solver as CANNON.GSSolver).iterations = 20; // stable for a 12-layer stack at 120 Hz
   (world.solver as CANNON.GSSolver).tolerance = 1e-5;
   const cm = world.defaultContactMaterial;
   // cannon friction is per contact point (load-independent), so loose blocks (fewer contacts) slide out

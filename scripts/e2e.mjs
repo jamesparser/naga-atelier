@@ -364,15 +364,20 @@ await pinch(1); await wait(120); await pinch(0); await wait(600);
       const w = await local(x + (side === 'left' ? -0.06 : 0.06), y, z);
       await page.evaluate(({ side, w }) => window.__iwer.hands[side].position.set(w[0], w[1], w[2]), { side, w });
     }
-    await wait(400);
+    await wait(1000); // lanes need ~0.3 s settle + 0.18 s hold (slow emulator frames)
   };
   await page.evaluate(() => { const a = window.__naga.arcade(); a.debugAt(a.debugState().dist); }); // clear the road so a stumble can't block the jump
   await both(-0.25, 0.3, 0.2);
   const l = (await gst()).lane;
   await both(0, 0.3, 0.2);
   const c = (await gst()).lane;
-  await both(0, 0.6, 0.2);
-  const j = (await gst()).jumpY;
+  // raise both arms and watch for the jump (it only lasts ~0.6 s)
+  for (const side of ['left', 'right']) {
+    const w = await local(side === 'left' ? -0.06 : 0.06, 0.6, 0.2);
+    await page.evaluate(({ side, w }) => window.__iwer.hands[side].position.set(w[0], w[1], w[2]), { side, w });
+  }
+  let j = 0;
+  for (let i = 0; i < 15 && j <= 0.02; i++) { await wait(80); j = Math.max(j, (await gst()).jumpY); }
   check('mike penguin: arms left = left lane, centre = middle, both arms up = jump (no pinch)', l === -1 && c === 0 && j > 0.02, JSON.stringify({ l, c, j }));
 }
 await shot('13-penguin');

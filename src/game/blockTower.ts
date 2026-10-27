@@ -27,6 +27,9 @@ import { BH, BL, BW, createTower, createTowerWorld, driveHeld, holdBlock, longAx
 
 const S = 0.12; // render scale: sim metres -> desk metres
 const ORIGIN = new Vector3(0, 0.0, -0.06);
+const PHYS_STEP = 1 / 120;
+const HOVER_C = new Color(0xfff2c4);
+const SELECT_C = new Color(0x9ff7ff);
 const WOOD = [0xd9b07a, 0xc99a63, 0xe3c08f, 0xbf8f5a];
 
 export class BlockTower extends GameBase {
@@ -42,10 +45,11 @@ export class BlockTower extends GameBase {
   private score = 0;
   private state: 'play' | 'fell' = 'play';
   private fellT = 0;
-  private acc = 0;
   private tmpM = new Matrix4();
   private tmpQ = new Quaternion();
   private tmpC = new Color();
+  private tmpP = new Vector3();
+  private tmpS = new Vector3();
   private ring: Mesh;
 
   constructor(deskRoot: Object3D, host: GameHost) {
@@ -85,7 +89,6 @@ export class BlockTower extends GameBase {
     this.score = 0;
     this.state = 'play';
     this.selected = this.blocks.findIndex((b) => b.thin) ;
-    this.acc = 0;
   }
 
   action(id: string): void {
@@ -284,26 +287,24 @@ export class BlockTower extends GameBase {
       }
     }
     // --- physics -------------------------------------------------------------------------
-    this.acc += Math.min(dt, 0.05);
-    while (this.acc >= 1 / 120) {
-      if (this.grab) {
-        const b = this.grab.block.body;
-        // where the block centre must be so the grabbed point lands on the hand
-        const offset = b.pointToWorldFrame(this.grab.localPt).vsub(b.position);
-        driveHeld(b, this.grab.home, this.grab.target.vsub(offset), 1 / 15);
-      } else if (this.auto) {
-        driveHeld(this.auto.block.body, this.auto.home, this.auto.goal, 1 / 12);
-        this.auto.t += 1 / 120;
-        if (this.auto.t > 0.45) {
-          const b = this.auto.block;
-          holdBlock(b.body, false);
-          this.auto = null;
-          if (Math.hypot(b.body.position.x, b.body.position.z) > 0.55) this.toTop(b);
-        }
+    // Fixed 120 Hz steps, at most 3 per frame so a busy frame can't snowball,
+    // and blocks are drawn interpolated between steps: smooth, no judder.
+    if (this.grab) {
+      const b = this.grab.block.body;
+      // where the block centre must be so the grabbed point lands on the hand
+      const offset = b.pointToWorldFrame(this.grab.localPt).vsub(b.position);
+      driveHeld(b, this.grab.home, this.grab.target.vsub(offset), 1 / 15);
+    } else if (this.auto) {
+      driveHeld(this.auto.block.body, this.auto.home, this.auto.goal, 1 / 12);
+      this.auto.t += dt;
+      if (this.auto.t > 0.45) {
+        const b = this.auto.block;
+        holdBlock(b.body, false);
+        this.auto = null;
+        if (Math.hypot(b.body.position.x, b.body.position.z) > 0.55) this.toTop(b);
       }
-      this.world.step(1 / 120);
-      this.acc -= 1 / 120;
     }
+    this.world.step(PHYS_STEP, Math.min(dt, 0.1), 3);
     if (this.state === 'play' && towerFell(this.blocks, this.grab?.block.body ?? null)) {
       this.fellT += dt;
       if (this.fellT > 0.35) {
@@ -328,14 +329,17 @@ export class BlockTower extends GameBase {
 
   private draw(now: number): void {
     this.blocks.forEach((b, i) => {
-      const p = b.body.position, q = b.body.quaternion;
+      // interpolated pose = smooth motion between fixed physics steps
+      const p = b.body.interpolatedPosition, q = b.body.interpolatedQuaternion;
       this.tmpQ.set(q.x, q.y, q.z, q.w);
-      this.tmpM.compose(new Vector3(p.x, p.y, p.z), this.tmpQ, new Vector3(1, b.thin ? (BH - THIN) / BH : 1, 1));
+      this.tmpP.set(p.x, p.y, p.z);
+      this.tmpS.set(1, b.thin ? (BH - THIN) / BH : 1, 1);
+      this.tmpM.compose(this.tmpP, this.tmpQ, this.tmpS);
       this.mesh.setMatrixAt(i, this.tmpM);
       this.tmpC.setHex(WOOD[(b.layer * 3 + b.slot * 7) % WOOD.length]);
       if (this.grab?.block === b) this.tmpC.setHex(0xffd166);
-      else if (this.hover === b) this.tmpC.lerp(new Color(0xfff2c4), 0.6);
-      else if (i === this.selected && this.state === 'play') this.tmpC.lerp(new Color(0x9ff7ff), 0.35 + 0.15 * Math.sin(now / 200));
+      else if (this.hover === b) this.tmpC.lerp(HOVER_C, 0.6);
+      else if (i === this.selected && this.state === 'play') this.tmpC.lerp(SELECT_C, 0.35 + 0.15 * Math.sin(now / 200));
       this.mesh.setColorAt(i, this.tmpC);
     });
     this.mesh.count = this.blocks.length;

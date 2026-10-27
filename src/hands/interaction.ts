@@ -141,7 +141,8 @@ export class Interaction {
           // Fingers are still closing during the first ~120 ms; let the anchor settle with them.
           if (now - st.t0 < 120 || ++st.frames <= 3) {
             st.start.copy(local);
-            st.hit = this.pick(local) ?? st.hit;
+            // a pinch that lands a little off a block still grabs it (fingers drift as they close)
+            st.hit = this.pick(local) ?? st.hit ?? this.pick(local, 1.35);
             st.settled = now;
           }
           // While the fingers are opening, the midpoint drifts; judge movement by the last firm pinch.
@@ -151,6 +152,7 @@ export class Interaction {
             this.states.set(p.id, { k: 'ignore' }); // block vanished (agent/undo)
             break;
           }
+          if (!st.hit && st.firm.distanceTo(st.start) < DRAG_THRESHOLD) st.hit = this.pick(st.firm, 1.35);
           if (!st.hit) {
             // pinch in empty space: a see-through cube shows where the block will go; move to aim,
             // open your fingers to place it there
