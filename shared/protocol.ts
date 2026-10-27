@@ -81,6 +81,7 @@ export const COMMAND_TYPES = [
   'save',
   'load',
   'board',
+  'turn',
 ] as const;
 export const INFO_QUESTIONS = ['count', 'describe', 'size', 'saves'] as const;
 export type InfoQuestion = (typeof INFO_QUESTIONS)[number];

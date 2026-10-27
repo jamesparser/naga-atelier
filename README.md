@@ -32,6 +32,8 @@ Built for the Meta VR Start Developer Competition 2026 (Productivity track, New 
 | Release over the red bin | Deletes what you are carrying |
 | Invalid drop (out of bounds, blocked) | Springs back with an audio cue |
 | Poke (or pinch) a dock button | Mic · Undo · Redo · 8 colours · ★ draft a blueprint · Re-centre desk |
+| TURN ⟲ / TURN ⟳ | Turn the whole game 45° either way (e.g. to face someone beside you); RECENTER puts it back in front of you |
+| SPIN | Spins your build a quarter turn on the board, like a turntable, to see its other sides (or say “spin the board”) |
 
 Hand tracking has no haptics, so every action has a sound: pickup tick, snap thunk, delete whoosh, undo chime.
 Everything sits within about 60 cm of a seated user, and the dock is in the lower field of view.

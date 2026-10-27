@@ -37,7 +37,8 @@ const LANE = 0.7;
 const ROAD_DROP = 0.62; // road surface below your eyes
 const FAR = -40;
 const STAGE_M = 420;
-const STAGE_TIME = 40;
+/** time to reach each flag: generous for the warm-up first stage, tighter after */
+const STAGE_TIME = 65;
 /** fewer flakes streaming past = less peripheral motion (comfort) */
 const SNOW = 110;
 const JUMP_V = 2.6, G = -9;
@@ -85,7 +86,8 @@ export class MikePenguin extends GameBase {
   private rnd = mulberry32(5);
   private eye = new Vector3();
   private gest = new Map<number, { x: number; y: number; t: number; moved: boolean }>();
-  private stickArmed = true;
+  /** per controller: a stick push must return to centre before it moves another lane */
+  private stickArmed = new Map<number, boolean>();
   /** body steering: arms left / centre / right pick the lane, both arms up = jump */
   private pendingZone = 0;
   private appliedZone = 0;
@@ -178,7 +180,7 @@ export class MikePenguin extends GameBase {
     this.jumpV = 0;
     this.speed = 0;
     this.dist = 0;
-    this.nextSpawn = 14;
+    this.nextSpawn = 22; // a short calm stretch to get going
     this.stage = 1;
     this.timeLeft = STAGE_TIME;
     this.fish = 0;
@@ -189,7 +191,10 @@ export class MikePenguin extends GameBase {
   }
 
   private topSpeed(): number {
-    return (this.slow ? 5.5 : 10.5) + Math.min(3.5, (this.stage - 1) * 1);
+    // starts as a gentle jog and builds up over the run (about +1 m/s every 60 m), capped
+    const ramp = Math.min(9, this.dist / 60);
+    const top = 4 + ramp;
+    return this.slow ? Math.min(top, 4.5) : top;
   }
 
   private go(): boolean {
@@ -268,8 +273,9 @@ export class MikePenguin extends GameBase {
       const p = f.p;
       if (p.gamepad) {
         const ax = p.gamepad.axes[2] ?? 0, ay = p.gamepad.axes[3] ?? 0;
-        if (Math.abs(ax) > 0.6 && this.stickArmed) { this.step(Math.sign(ax)); this.stickArmed = false; }
-        if (Math.abs(ax) < 0.3) this.stickArmed = true;
+        const armed = this.stickArmed.get(p.id) ?? true;
+        if (Math.abs(ax) > 0.6 && armed) { this.step(Math.sign(ax)); this.stickArmed.set(p.id, false); }
+        if (Math.abs(ax) < 0.3) this.stickArmed.set(p.id, true);
         this.slow = ay > 0.6;
         if (p.gamepad.buttons[4]?.pressed || p.gamepad.buttons[5]?.pressed) this.jump();
       }
@@ -371,7 +377,7 @@ export class MikePenguin extends GameBase {
       for (const o of this.obs) o.z += dz;
       if (this.stateT > 2.6) {
         this.stage++;
-        this.timeLeft = Math.max(30, STAGE_TIME - (this.stage - 1) * 3);
+        this.timeLeft = Math.max(32, 50 - (this.stage - 2) * 4);
         this.state = 'play';
         this.host.say(`Stage ${this.stage}. Faster now!`);
       }
@@ -446,19 +452,20 @@ export class MikePenguin extends GameBase {
   private spawnRow(at: number): void {
     const r = this.rnd;
     const z = -(at - this.dist);
-    const diff = Math.min(1, (this.stage - 1) * 0.25 + this.dist / (STAGE_M * 3));
+    // obstacles start sparse and get denser the further you run
+    const diff = Math.min(1, this.dist / 1300);
     const roll = r();
-    if (roll < 0.12 + diff * 0.06) {
+    if (roll < 0.05 + diff * 0.13) {
       this.obs.push({ kind: 'crack', lane: 0, z, hit: false });
     } else {
       // block one or two lanes, never all three
       const lanes = [-1, 0, 1].sort(() => r() - 0.5);
-      const n = r() < 0.35 + diff * 0.3 ? 2 : 1;
+      const n = r() < 0.12 + diff * 0.55 ? 2 : 1;
       for (let i = 0; i < n; i++) this.obs.push({ kind: r() < 0.5 ? 'seal' : 'hole', lane: lanes[i], z, hit: false });
       if (r() < 0.7) this.obs.push({ kind: 'fish', lane: lanes[2], z: z - 0.01, hit: false });
     }
     if (r() < 0.4) this.obs.push({ kind: 'fish', lane: Math.floor(r() * 3) - 1, z: z - 4, hit: false });
-    this.nextSpawn = at + Math.max(5.5, 10 - diff * 4) * (0.8 + r() * 0.5);
+    this.nextSpawn = at + Math.max(6, 14 - diff * 8) * (0.8 + r() * 0.5);
   }
 
   private draw(now: number, dt: number): void {

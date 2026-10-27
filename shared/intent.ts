@@ -189,6 +189,11 @@ export function parseIntent(raw: string): AgentEnvelope | null {
   if (/^ (drop( it)?|slam( it)?|hard drop) $/.test(t)) {
     return envelope('Drop!', { v: 1, type: 'game', action: 'drop' });
   }
+  // --- turn the whole game (desk) to face someone: "turn the desk left", "rotate the table counter clockwise"
+  if (/\b(turn|rotate|swing|spin)\b/.test(t) && /\b(desk|table|game|whole game|workspace|everything around)\b/.test(t) && !/\b(board|build)\b/.test(t)) {
+    const ccw = /\b(left|counter|anti|ccw)\b/.test(t);
+    return envelope(ccw ? 'Turning the desk left.' : 'Turning the desk right.', { v: 1, type: 'turn', turns: ccw ? 1 : 3 });
+  }
   // --- board colour: "make the board blue", "board colour black", "clear board" -------------
   if (/\b(board|base ?plate|build mat|mat)\b/.test(t) && !/\b(game|tetris|floor ?plan)\b/.test(t)) {
     if (/\b(clear|see.?through|transparent|invisible)\b/.test(t)) return envelope('See-through board.', { v: 1, type: 'board', color: 'glass' });
@@ -267,7 +272,9 @@ export function parseIntent(raw: string): AgentEnvelope | null {
     // --- rotate ----------------------------------------------------------
     if (/\b(rotate|spin|turn (it|that|this) ?(around|round)?|face the other way)\b/.test(t)) {
       const turns = /\b(around|round|other way|180)\b/.test(t) ? 2 : /\b(left|counter|anti)\b/.test(t) ? 3 : 1;
-      return envelope('Rotating it.', { v: 1, type: 'rotate', turns, target: 'last' });
+      // "spin the board / rotate everything": turn the whole build like a turntable to see its other sides
+      const all = /\b(everything|all of it|whole (build|thing)|the board|the build|my build)\b/.test(t);
+      return envelope(all ? 'Spinning your build.' : 'Rotating it.', { v: 1, type: 'rotate', turns, target: all ? 'all' : 'last' });
     }
     // --- move ------------------------------------------------------------
     const moveVerb = /\b(move|nudge|shift|slide|push|bring|pull)\b/.test(t);

@@ -212,6 +212,13 @@ function start(): void {
   let starterKey: string | null = null;
 
   /** Apply one command now (caller guarantees hands are not mid-carry). */
+  /** Turn the whole game (desk, dock, everything) 45° about its centre: +1 = counter-clockwise from above. */
+  const turnDesk = (dir: 1 | -1) => {
+    interaction.cancelAll();
+    deskRoot.rotation.y += (dir * Math.PI) / 4;
+    deskRoot.updateMatrixWorld(true);
+    sfx.play('rotate');
+  };
   // board colour (green by default), remembered on this device
   const BOARD_KEY = 'naga-atelier:board:v1';
   let boardColor = 'grass';
@@ -241,6 +248,10 @@ function start(): void {
     }
   };
   const apply = (cmd: BuildCommand): { ok: boolean; speech?: string; answer?: boolean } => {
+    if (cmd.type === 'turn') {
+      turnDesk(cmd.turns === 3 ? -1 : 1);
+      return { ok: true, speech: cmd.turns === 3 ? 'Turned the desk clockwise.' : 'Turned the desk counter-clockwise.', answer: true };
+    }
     if (cmd.type === 'board') {
       const cur = BOARD_ORDER.indexOf(boardColor as (typeof BOARD_ORDER)[number]);
       const next = cmd.color && cmd.color in BOARD_COLORS ? cmd.color : BOARD_ORDER[(cur + 1) % BOARD_ORDER.length];
@@ -479,6 +490,16 @@ function start(): void {
       case 'board':
         say(apply({ v: 1, type: 'board' }).speech ?? '');
         break;
+      case 'deskL':
+      case 'deskR':
+        turnDesk(action === 'deskL' ? 1 : -1);
+        break;
+      case 'spinBuild': {
+        interaction.cancelAll();
+        const r = apply({ v: 1, type: 'rotate', target: 'all', turns: 1 });
+        say(r.ok ? 'Spun your build a quarter turn.' : (r.speech ?? "There isn't room to spin it here."));
+        break;
+      }
       case 'clear':
         interaction.cancelAll();
         if (apply({ v: 1, type: 'clear' }).ok) say(model.canUndo() ? 'Desk cleared. Tap UNDO to bring it back.' : 'The desk is already clear.');

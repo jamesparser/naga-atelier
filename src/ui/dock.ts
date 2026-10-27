@@ -25,7 +25,7 @@ export type DockAction =
   | 'spin' | 'flip' | 'tilt' | 'drop' | 'pause' | 'exit' | 'depth'
   // Sling mode
   | 'retry' | 'next' | 'turnL' | 'turnR' | 'zoom'
-  | 'clear' | 'board'
+  | 'clear' | 'board' | 'deskL' | 'deskR' | 'spinBuild'
   // arcade games
   | 'start' | 'fire' | 'totop' | 'flap' | 'jump' | 'view'
   // mode bar + arcade picker
@@ -41,6 +41,9 @@ export const DOCK_LABELS: Partial<Record<DockAction, [string, string]>> = {
   grid: ['BLOCK SIZE', 'Change block size (your build comes along)'],
   clear: ['CLEAR', 'Clear the desk (UNDO brings it back)'],
   board: ['BOARD', 'Change the board colour'],
+  deskL: ['TURN ⟲', 'Turn the whole game counter-clockwise (45°)'],
+  deskR: ['TURN ⟳', 'Turn the whole game clockwise (45°)'],
+  spinBuild: ['SPIN', 'Spin your build a quarter turn to see its other side'],
   recenter: ['RECENTER', 'Move the desk in front of you'],
   game: ['TETRIS', 'Play 3D Tetris'],
   sling: ['ANGRY SLING', 'Play Angry Sling'],
@@ -87,6 +90,9 @@ export const BUILD_LAYOUT: Array<[DockAction, number]> = [
   ['grid', 0.018],
   ['clear', 0.018],
   ['board', 0.018],
+  ['spinBuild', 0.018],
+  ['deskL', 0.018],
+  ['deskR', 0.018],
   ['recenter', BIG],
 ];
 
@@ -495,6 +501,23 @@ function iconTexture(id: DockAction): CanvasTexture {
       g.closePath(); g.fill();
       break;
     }
+    case 'deskL':
+    case 'deskR': { // curved arrow, counter-clockwise or clockwise
+      const ccw = id === 'deskL';
+      g.lineWidth = 10;
+      g.beginPath();
+      g.arc(64, 66, 34, ccw ? -0.2 : Math.PI + 0.2, ccw ? Math.PI * 1.25 : -Math.PI * 0.25, !ccw);
+      g.stroke();
+      const ax = ccw ? 64 + 34 * Math.cos(-0.2) : 64 + 34 * Math.cos(Math.PI + 0.2), ay = ccw ? 66 + 34 * Math.sin(-0.2) : 66 + 34 * Math.sin(Math.PI + 0.2);
+      g.beginPath(); g.moveTo(ax - 14, ay - 4); g.lineTo(ax + 14, ay - 4); g.lineTo(ax, ay + 14); g.closePath(); g.fill();
+      break;
+    }
+    case 'spinBuild': // turntable: a disc with an arrow around it
+      g.beginPath(); g.ellipse(64, 80, 40, 14, 0, 0, Math.PI * 2); g.fill();
+      g.fillRect(52, 40, 24, 34);
+      g.lineWidth = 7;
+      g.beginPath(); g.ellipse(64, 60, 52, 22, 0, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
+      break;
     case 'board': // a tiled square
       g.lineWidth = 6;
       g.strokeRect(24, 24, 80, 80);

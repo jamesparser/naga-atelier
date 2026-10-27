@@ -366,6 +366,7 @@ await pinch(1); await wait(120); await pinch(0); await wait(600);
     }
     await wait(400);
   };
+  await page.evaluate(() => { const a = window.__naga.arcade(); a.debugAt(a.debugState().dist); }); // clear the road so a stumble can't block the jump
   await both(-0.25, 0.3, 0.2);
   const l = (await gst()).lane;
   await both(0, 0.3, 0.2);
