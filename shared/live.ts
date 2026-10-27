@@ -129,6 +129,36 @@ export async function weatherAnswer(text: string, geo: Geo, city?: string | null
   }
 }
 
+/** "search for…", "look up…", "google…" → the query, or null */
+export function explicitSearch(text: string): string | null {
+  const m = text.match(/^\s*(?:hey naga,?\s*)?(?:please\s+)?(?:search(?: the web| online| the internet)?(?: for)?|look up|google|find out|check online(?: for)?)\s+(.{3,})$/i);
+  return m ? m[1].replace(/[?.!]+$/, '').trim() : null;
+}
+
+/** Questions that obviously need fresh facts go straight to web search (no model round-trip). */
+const CURRENT_RE =
+  /\b(latest|news|headlines?|this week|today'?s|right now|currently|recent(ly)?|stock price|share price|price of|how much is .* (worth|trading)|exchange rate|score of|who won|election|released|announced)\b/i;
+export function isCurrentQuestion(text: string): boolean {
+  return CURRENT_RE.test(text) && !/\b(build|make|sculpt|create|draw|desk|block|grid|board|undo|save|load)\b/i.test(text);
+}
+
+/** All configured Tavily keys, in order: TAVILY_API_KEY (may be comma-separated), then TAVILY_API_KEY_2. */
+export function tavilyKeys(env: { TAVILY_API_KEY?: string; TAVILY_API_KEY_2?: string }): string[] {
+  return [env.TAVILY_API_KEY, env.TAVILY_API_KEY_2]
+    .flatMap((k) => (k ?? '').split(','))
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
+
+/** Try each key until one answers (a dead, rate-limited or out-of-credit key falls through to the next). */
+export async function webAnswerAny(keys: string[], query: string): Promise<string | null> {
+  for (const k of keys) {
+    const a = await webAnswer(k, query);
+    if (a) return a;
+  }
+  return null;
+}
+
 /** Tavily web search → a short spoken answer (first two sentences). */
 export async function webAnswer(apiKey: string, query: string): Promise<string | null> {
   try {

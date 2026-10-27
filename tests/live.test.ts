@@ -41,3 +41,42 @@ describe('languages', () => {
     expect(sanitizeEnvelope({ speech: 'x', build: null, lang: '<script>' })?.lang).toBeUndefined();
   });
 });
+
+describe('web search', () => {
+  it('catches explicit search requests', async () => {
+    const { explicitSearch, tavilyKeys } = await import('../shared/live.js');
+    expect(explicitSearch('search for the price of bitcoin')).toBe('the price of bitcoin');
+    expect(explicitSearch('look up who won the world cup?')).toBe('who won the world cup');
+    expect(explicitSearch('build a house')).toBeNull();
+    expect(tavilyKeys({ TAVILY_API_KEY: 'a, b', TAVILY_API_KEY_2: 'c' })).toEqual(['a', 'b', 'c']);
+    expect(tavilyKeys({})).toEqual([]);
+  });
+  it('falls back to the second key when the first fails', async () => {
+    const { webAnswerAny } = await import('../shared/live.js');
+    const seen: string[] = [];
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+      const auth = (init?.headers as Record<string, string>).authorization;
+      seen.push(auth);
+      if (auth.endsWith('bad')) return new Response('{}', { status: 432 });
+      return new Response(JSON.stringify({ answer: 'Bitcoin is about 100k. Source says so. Extra.' }), { status: 200 });
+    }) as typeof fetch;
+    try {
+      expect(await webAnswerAny(['bad', 'good'], 'btc')).toBe('Bitcoin is about 100k. Source says so.');
+      expect(seen).toEqual(['Bearer bad', 'Bearer good']);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+});
+
+describe('current-events routing', () => {
+  it('sends news/price questions to search, not builds', async () => {
+    const { isCurrentQuestion } = await import('../shared/live.js');
+    expect(isCurrentQuestion("what's the latest news about nvidia")).toBe(true);
+    expect(isCurrentQuestion('what is the price of bitcoin')).toBe(true);
+    expect(isCurrentQuestion('who won the game last night')).toBe(true);
+    expect(isCurrentQuestion('build the latest iphone')).toBe(false);
+    expect(isCurrentQuestion('how many blocks are on my desk')).toBe(false);
+  });
+});

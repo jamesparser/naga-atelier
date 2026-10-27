@@ -55,7 +55,7 @@ export const TETRIS_PAD: PadLayout = {
     { head: 'Rows deep', lines: ['1 row = classic Tetris (easiest) · 2–4 rows = 3D', 'Keys 1–4, the row buttons, or ROWS on the desk', 'Changing rows starts a new game'] },
     { head: 'Keyboard', lines: ['← → move left / right', '↑ ↓ move to the back / front row (with 1 row: ↑ rotate, ↓ faster)', 'Q or E spin · R flip · F tilt', 'Shift hold = faster · Space = drop', 'P pause · Esc back to build'] },
     { head: 'Mouse or touch', lines: ['Drag on the game to slide the piece', 'Quick click / tap = spin', 'Use the buttons for flip, tilt, drop'] },
-    { head: 'Quest — hands', lines: ['Pinch anywhere and move your hand to slide the piece', 'Pinch and twist your wrist to flip it', 'Quick pinch = spin · flick down = drop', 'Poke the labelled buttons on the desk', 'Poke ROWS 1-4 to pick how deep (1 = classic)'] },
+    { head: 'Quest — hands', lines: ['Pinch anywhere and move your hand to slide the piece', 'Pinch and twist your wrist to flip it', 'Quick pinch = spin · or hold with one hand and pinch with the other', 'Pull down = faster · flick down = drop', 'Poke the labelled buttons on the desk', 'Poke ROWS 1-4 to pick how deep (1 = classic)'] },
     { head: 'Quest — controllers', lines: ['Thumbstick: left / right, push up = back row, down = front row', 'A or X = spin · B or Y = flip · press stick = tilt', 'Hold grip = faster · trigger = drop'] },
   ],
 };

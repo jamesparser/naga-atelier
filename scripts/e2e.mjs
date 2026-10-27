@@ -286,6 +286,26 @@ await wait(2500); // let the swarm fly in
   await pinch(0);
   check('star swarm: pinch-move steers the ship and holding fires', g.ship[0] > x0 + 0.02 && (g.score > 0 || g.aliens < 20), JSON.stringify(g));
 }
+{
+  await arc('debugGod', true);
+  await arc('action', 'start');
+  await wait(300);
+  await arc('debugPower', 'shield');
+  await arc('debugPower', 'double');
+  await wait(600);
+  let g = await gst();
+  check('star swarm: flying into power-ups catches them (shield + twin guns)', g.caught.includes('shield') && g.caught.includes('double') && g.twin, JSON.stringify(g));
+  await arc('debugClearWave');
+  await wait(800);
+  g = await gst();
+  check('star swarm: clearing the wave brings the mothership boss', g.state === 'boss' && g.boss && g.boss.max > 20, JSON.stringify(g));
+  await arc('debugHitBoss', 999);
+  await wait(400);
+  g = await gst();
+  check('star swarm: beating the boss warps on and drops prizes', g.state === 'warp' && !g.boss && g.powers.length >= 1, JSON.stringify(g));
+  await wait(2600);
+  check('star swarm: next wave starts after the boss', (await gst()).wave === 2, JSON.stringify(await gst()));
+}
 await page.evaluate(() => window.__naga.setMode('whack'));
 await wait(500);
 await arc('debugForceUp', 4);

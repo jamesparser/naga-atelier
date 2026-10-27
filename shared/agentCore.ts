@@ -4,7 +4,7 @@
  */
 import { BLUEPRINT_IDS, PALETTE_NAMES, sanitizeEnvelope, type AgentEnvelope } from './protocol.js';
 import { fallbackEnvelope, parseIntent } from './intent.js';
-import { isTimeQuestion, isWeatherQuestion, timeAnswer, weatherAnswer, webAnswer, type Geo } from './live.js';
+import { explicitSearch, isCurrentQuestion, isTimeQuestion, isWeatherQuestion, tavilyKeys, timeAnswer, weatherAnswer, webAnswerAny, type Geo } from './live.js';
 
 export interface AgentEnv {
   LLM_BASE_URL?: string;
@@ -16,8 +16,9 @@ export interface AgentEnv {
   TTS_BASE_URL?: string;
   TTS_API_KEY?: string;
   TTS_VOICE?: string;
-  /** optional: Tavily web search for current-events questions */
+  /** optional: Tavily web search for anything current; a second key is tried if the first fails */
   TAVILY_API_KEY?: string;
+  TAVILY_API_KEY_2?: string;
   AGENT_MODE?: string; // "hybrid" (default) | "llm" | "rules"
 }
 
@@ -165,10 +166,11 @@ async function resolveLive(env: AgentEnv, e: LiveEnvelope, geo: Geo, text: strin
     return { ...w, source: `${e.source}+weather` };
   }
   if (search) {
-    if (!env.TAVILY_API_KEY) {
+    const keys = tavilyKeys(env);
+    if (!keys.length) {
       return { ...rest, build: null, lang: 'en', speech: "I can't look that up yet — web search isn't switched on.", source: `${e.source}+search(off)` };
     }
-    const a = await webAnswer(env.TAVILY_API_KEY, search);
+    const a = await webAnswerAny(keys, search);
     return a
       ? { ...rest, build: null, lang: 'en', speech: a, source: `${e.source}+search` }
       : { ...rest, build: null, lang: 'en', speech: "I couldn't find that online just now.", source: `${e.source}+search(miss)` };
@@ -183,6 +185,8 @@ export async function decide(env: AgentEnv, text: string, scene = '', geo: Geo =
   // live info that needs no model: weather and the clock
   if (isWeatherQuestion(text)) return done(await weatherAnswer(text, geo));
   if (isTimeQuestion(text)) return done(timeAnswer(geo));
+  const asked = explicitSearch(text) ?? (isCurrentQuestion(text) ? text.replace(/^\s*(hey\s+)?naga[,!]?\s*/i, '') : null);
+  if (asked && tavilyKeys(env).length) return done(await resolveLive(env, { speech: '', build: null, source: 'direct', search: asked }, geo, text));
   const rules = parseIntent(text);
   if (mode === 'rules' || !env.LLM_API_KEY) return done(rules ?? fallbackEnvelope(text));
   // Hybrid: clear, recognised commands take the fast deterministic path (sub-100 ms);
@@ -214,6 +218,9 @@ export async function decide(env: AgentEnv, text: string, scene = '', geo: Geo =
     if (llm) {
       const l = llm as LiveEnvelope;
       if (l.search || l.weather !== undefined) return done(await resolveLive(env, l, geo, text));
+      // safety net: the model said it can't browse — search the question instead of giving up
+      if (!llm.build && tavilyKeys(env).length && /(real[- ]?time|internet|browse|live data|up[- ]to[- ]date|current (info|data)|don'?t have access|can'?t access|knowledge cutoff)/i.test(llm.speech))
+        return done(await resolveLive(env, { ...llm, search: text }, geo, text));
       if (!llm.build && rules?.build) return done({ ...rules, speech: llm.speech || rules.speech });
       return done(llm);
     }

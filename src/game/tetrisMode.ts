@@ -6,7 +6,7 @@
  *   pinch anywhere + move        steer the falling piece left/right and toward/away (relative, snapped)
  *   pinch + pull down            soft drop · flick down fast = hard drop
  *   pinch + twist your wrist     flip the piece about the axis you twisted around
- *   quick pinch-tap              spin the piece (vertical axis)
+ *   quick pinch-tap              spin the piece (vertical axis); or pinch the other hand while steering
  *   poke the dock                tilt · flip · spin · drop · pause · back to build
  * Controller (optional): thumbstick steer · A/X spin · B/Y flip · grip tilt · stick-click drop
  */
@@ -45,7 +45,9 @@ import { Tetris3D, WELL_D, WELL_H, WELL_W, type Axis, type Piece, type TetrisEve
 const OX = -WELL_W / 2, OZ = -WELL_D / 2; // OZ = layout reference for panels (deepest well)
 const DEPTH_KEY = 'naga-atelier:tetris-depth:v1';
 
-const TWIST_RAD = (50 * Math.PI) / 180;
+const TWIST_RAD = (38 * Math.PI) / 180;
+/** ignore hand motion for this long after a pinch closes (fingers snapping shut jiggle the pinch point) */
+const SETTLE_MS = 120;
 /** The game always uses 4 cm cubes, whatever block-size preset the build grid uses. */
 const TCELL = 0.04;
 const BEST_KEY = 'naga-atelier:tetris-best:v1';
@@ -63,6 +65,8 @@ interface Grab {
   lastT: number;
   vy: number;
   done: boolean;
+  /** still inside the settle window after the pinch closed */
+  settling: boolean;
 }
 
 export interface TetrisHost {
@@ -345,6 +349,12 @@ export class TetrisMode {
         }
         // Controllers steer with the thumbstick; their trigger is "slam" (handled in handlePad).
         if (p.kind === 'controller') continue;
+        // already steering with the other hand? this pinch spins the piece right away
+        if ([...this.grabs.keys()].some((id) => id !== p.id)) {
+          this.action('spin');
+          this.grabs.set(p.id, { startLocal: local.clone(), startX: 0, startZ: 0, dropped: 0, q0: null, t0: now, maxMove: 0, rotated: true, lastY: local.y, lastT: now, vy: 0, done: true, settling: false });
+          continue;
+        }
         const piece = this.game.piece;
         this.grabs.set(p.id, {
           startLocal: local.clone(),
@@ -359,6 +369,7 @@ export class TetrisMode {
           lastT: now,
           vy: 0,
           done: false,
+          settling: true,
         });
         sfx.play('tick');
         continue;
@@ -367,11 +378,26 @@ export class TetrisMode {
       if (!g) continue;
       if (up) {
         this.grabs.delete(p.id);
-        if (!g.done && !g.rotated && now - g.t0 < 280 && g.maxMove < 0.02) this.action('spin');
+        // a quick pinch-tap spins (a little more forgiving than before)
+        if (!g.done && !g.rotated && now - g.t0 < 420 && g.maxMove < 0.03) this.action('spin');
         continue;
       }
       if (g.done || !p.pinching) continue;
-      if (p.kind === 'hand' && p.strength < 0.75) continue; // ignore the drift while fingers open
+      if (g.settling) {
+        // re-anchor once the pinch has settled so the snap of closing fingers never moves the piece
+        if (now - g.t0 < SETTLE_MS) continue;
+        g.settling = false;
+        g.startLocal.copy(local);
+        g.lastY = local.y;
+        g.lastT = now;
+        const pc = this.game.piece;
+        if (pc) {
+          g.startX = pc.pos[0];
+          g.startZ = pc.pos[2];
+        }
+      }
+      // Quest reports pinch strength ~0.5-0.8 while held; only ignore a pinch that is clearly opening
+      if (p.kind === 'hand' && p.strength < 0.4) continue;
       this.steer(g, local, now);
       if (p.wristQuat && g.q0) this.twist(g, p.wristQuat);
     }
@@ -389,7 +415,7 @@ export class TetrisMode {
     g.vy = 0.6 * g.vy + 0.4 * ((local.y - g.lastY) / dtS);
     g.lastY = local.y;
     g.lastT = now;
-    if (g.vy < -1.1 && d.y < -0.05) {
+    if (g.vy < -0.8 && d.y < -0.04) {
       game.hardDrop();
       g.done = true;
       return;
@@ -398,7 +424,7 @@ export class TetrisMode {
     const tz = g.startZ + Math.round(d.z / TCELL);
     for (let i = 0; i < WELL_W && piece === game.piece && piece.pos[0] !== tx; i++) if (!game.move(Math.sign(tx - piece.pos[0]), 0, 0)) break;
     for (let i = 0; i < this.depth && piece === game.piece && piece.pos[2] !== tz; i++) if (!game.move(0, 0, Math.sign(tz - piece.pos[2]))) break;
-    const want = Math.floor(-d.y / (TCELL * 1.2));
+    const want = Math.floor(-d.y / (TCELL * 0.8)); // pull down: one row per ~3 cm
     while (want > g.dropped && piece === game.piece) {
       if (!game.move(0, -1, 0)) break;
       g.dropped++;
@@ -476,7 +502,7 @@ export class TetrisMode {
     switch (ev.type) {
       case 'rotate': sfx.play('rotate'); break;
       case 'move': sfx.play('tick'); break;
-      case 'blocked': sfx.play('error'); break;
+      case 'blocked': break; // silent: the wall-bump buzz was grating
       case 'lock': sfx.play('lock'); break;
       case 'clear': {
         const big = ev.rows.length >= 4 || ev.layers.length > 0;

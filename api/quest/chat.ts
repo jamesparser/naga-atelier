@@ -66,7 +66,7 @@ export async function GET(req: Request): Promise<Response> {
       llm: !!env.LLM_API_KEY,
       tts: !!env.TTS_BASE_URL,
       weather: true,
-      search: !!env.TAVILY_API_KEY,
+      search: !!(env.TAVILY_API_KEY || env.TAVILY_API_KEY_2),
       languages: 'auto',
       llmModel: env.LLM_MODEL || null,
       sculptModel: env.SCULPT_MODEL || DEFAULT_SCULPT_MODELS[0],

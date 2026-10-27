@@ -230,6 +230,10 @@ export abstract class GameBase {
       c.fillText(k, 32, y);
       c.fillStyle = '#eafcff';
       c.font = '800 46px system-ui, sans-serif';
+      // long values shrink to fit beside the label
+      const room = 448 - c.measureText(k).width * 0.75 - 40;
+      const w = c.measureText(v).width;
+      if (w > room) c.font = `800 ${Math.max(22, Math.floor((46 * room) / w))}px system-ui, sans-serif`;
       c.textAlign = 'right';
       c.fillText(v, 480, y + 4);
       c.textAlign = 'left';

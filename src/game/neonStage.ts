@@ -24,7 +24,7 @@ import { dotTexture } from '../fx/sparkles.js';
 
 const RINGS = 16;
 const DEPTH = 2.6; // metres the tunnel recedes behind the well
-const STARS = 420;
+const STARS = 220;
 
 /** Neon block texture: dark glassy face, bright glowing rim. Tinted per instance. */
 let neonTex: CanvasTexture | null = null;
@@ -124,11 +124,11 @@ export class NeonStage {
     this.root.add(this.dome, tunnel, stars);
   }
 
-  private resetStar(i: number, anywhere = false): void {
+  private resetStar(i: number, _anywhere = false): void {
     const cx = (this.x0 + this.x1) / 2, cy = this.h / 2;
     const a = Math.random() * Math.PI * 2;
     const r = 0.05 + Math.random() * 0.9;
-    const z = anywhere ? this.zBack - Math.random() * DEPTH * 1.6 : this.zBack - DEPTH * (1.2 + Math.random() * 0.4);
+    const z = this.zBack - 0.1 - Math.random() * DEPTH * 1.6;
     this.starPos.set([cx + Math.cos(a) * r * 1.6, cy + Math.sin(a) * r, z], i * 3);
     this.starVel[i] = 0.4 + Math.random() * 0.9;
   }
@@ -146,7 +146,9 @@ export class NeonStage {
   update(now: number, dt: number, level: number, danger: boolean): void {
     this.flash = Math.max(0, this.flash - dt * 2.2);
     this.warp = Math.max(0, this.warp - dt * 1.4);
-    const speed = 0.25 + level * 0.06 + this.warp * 0.6;
+    // comfort: the tunnel only drifts gently (fast motion toward you made people queasy); big hits
+    // show as brightness, not speed
+    const speed = 0.04 + Math.min(0.04, level * 0.005);
     this.phase = (this.phase + dt * speed) % 1;
     this.hue = (this.hue + dt * (0.04 + level * 0.008 + this.warp * 0.05)) % 1;
     this.tint.setHSL(this.hue, 0.85, 0.6);
@@ -189,14 +191,13 @@ export class NeonStage {
     this.tunnelGeo.attributes.position.needsUpdate = true;
     this.tunnelGeo.attributes.color.needsUpdate = true;
 
-    // --- stars ---------------------------------------------------------------
+    // --- stars: fixed in place behind the well, softly twinkling (no snow flying at you) ---
     const zNear = this.zBack + 0.9;
     for (let i = 0; i < STARS; i++) {
       const j = i * 3;
-      this.starPos[j + 2] += this.starVel[i] * dt * (0.6 + speed * 2.2);
-      if (this.starPos[j + 2] > zNear) this.resetStar(i);
       const t = 1 - Math.min(1, (zNear - this.starPos[j + 2]) / (DEPTH * 1.6));
-      c.setHSL((this.hue + i * 0.013) % 1, 0.7, 0.6 + 0.3 * t).multiplyScalar(0.3 + t);
+      const tw = 0.55 + 0.45 * Math.sin(now / (700 + this.starVel[i] * 900) + i);
+      c.setHSL((this.hue + i * 0.013) % 1, 0.7, 0.6).multiplyScalar((0.15 + 0.35 * t) * tw * (1 + this.flash * 0.5));
       this.starCol[j] = c.r; this.starCol[j + 1] = c.g; this.starCol[j + 2] = c.b;
     }
     this.starGeo.attributes.position.needsUpdate = true;
