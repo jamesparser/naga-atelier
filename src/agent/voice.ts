@@ -88,7 +88,7 @@ export class VoiceInput {
       const w = window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR };
       const Ctor = (w.SpeechRecognition ?? w.webkitSpeechRecognition)!;
       const rec = new Ctor();
-      rec.lang = 'en-US';
+      rec.lang = navigator.language || 'en-US';
       rec.interimResults = false;
       rec.maxAlternatives = 1;
       rec.continuous = false;

@@ -4,6 +4,7 @@
  */
 import { BLUEPRINT_IDS, PALETTE_NAMES, sanitizeEnvelope, type AgentEnvelope } from './protocol.js';
 import { fallbackEnvelope, parseIntent } from './intent.js';
+import { isTimeQuestion, isWeatherQuestion, timeAnswer, weatherAnswer, webAnswer, type Geo } from './live.js';
 
 export interface AgentEnv {
   LLM_BASE_URL?: string;
@@ -15,6 +16,8 @@ export interface AgentEnv {
   TTS_BASE_URL?: string;
   TTS_API_KEY?: string;
   TTS_VOICE?: string;
+  /** optional: Tavily web search for current-events questions */
+  TAVILY_API_KEY?: string;
   AGENT_MODE?: string; // "hybrid" (default) | "llm" | "rules"
 }
 
@@ -25,9 +28,9 @@ export interface AgentEnv {
 export const DEFAULT_SCULPT_MODELS = ['deepseek-ai/DeepSeek-V4-Flash-0731', 'openai/gpt-oss-120b'];
 
 export const SYSTEM_PROMPT = `You are Naga, a friendly spatial building companion in a Quest 3 mixed-reality desk app.
-The user speaks English. You place small voxel structures on their real desk; they fix details with their hands.
+You place small voxel structures on their real desk; they fix details with their hands.
 Reply with a SHORT spoken line (max 12 words) AND at most one build command, as JSON only:
-{"speech":"<short line>","build":{"v":1,"type":"build|sculpt|board|turn|duplicate|delete|mirror|replace|text|chart|floorplan|info|save|load|clear|color|move|undo|redo|scale|rotate|export|grid|game","blueprintId":"<id>","anchor":"desk_center|desk_left|desk_right|floating","color":"<palette>","scale":1.0,"target":"last|all|<part>","dx":0,"dy":0,"dz":0,"turns":1,"message":"<same as speech>"}}
+{"speech":"<short line>","lang":"<ISO 639-1 code of the user's language>","build":{"v":1,"type":"build|sculpt|board|turn|duplicate|delete|mirror|replace|text|chart|floorplan|info|save|load|clear|color|move|undo|redo|scale|rotate|export|grid|game","blueprintId":"<id>","anchor":"desk_center|desk_left|desk_right|floating","color":"<palette>","scale":1.0,"target":"last|all|<part>","dx":0,"dy":0,"dz":0,"turns":1,"message":"<same as speech>"}}
 Omit fields that do not apply. blueprintIds: ${BLUEPRINT_IDS.join(', ')}.
 Palette: ${PALETTE_NAMES.join(', ')} (red=roof_red, green=grass, blue=sky, yellow=gold, black=ink, grey=stone).
 Parts users may name as "target": roof, walls, windows, door, chimney, tower, top, flag, lawn, pond, tree, flowers, steps, books, pillars, arch, keystone, seat, legs, backrest, hearth, fire, hedges, wheels, sail, mast, deck, railings, river, wings, tail, nose, eyes, head, arms, leaves, trunk, hat, blanket, turrets, keep, lights, wagons, engine.
@@ -53,6 +56,9 @@ Desk tools (use them, they make you useful for real work):
 - "grid": block size; "preset":"draft|studio|detail|fine|mosaic|finer|coarser" ("I need more room" -> finer). The build is kept when the grid changes.
 The user message may start with "On the desk now: ..." listing objects (name@position[parts] blocks); use those names as "target".
 If the user is only chatting, set "build": null.
+LANGUAGE: always reply in the language the user spoke (English, Khmer, Spanish, French, Japanese, Chinese, Hindi...), set "lang" to its code, and keep every JSON key, type, blueprintId, palette name, part name and target in English.
+LIVE INFO: you have no internet yourself, but the app does. For the weather set "weather":"<city name in English, or empty for where the user is>" and "build": null.
+For anything else that needs current real-world facts (news, prices, scores, events, who holds a job now) set "search":"<short English web query>" and "build": null — never guess current facts.
 Never invent blueprint ids — use "sculpt" instead. Output JSON only, no markdown, no reasoning.`;
 
 function withTimeout(ms: number): AbortSignal {
@@ -129,11 +135,18 @@ export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000, sce
   const msg = data.choices?.[0]?.message;
   // Prefer content; if reasoning model spent the budget there, salvage the tail JSON.
   const content = (msg?.content ?? msg?.reasoning ?? '').trim();
-  let env2 = sanitizeEnvelope(extractJson(content));
+  let raw = extractJson(content);
+  let env2 = sanitizeEnvelope(raw);
   // some models drop the opening brace: '"speech":"…","build":{…}}'
-  if (!env2 && content.includes('"speech"')) env2 = sanitizeEnvelope(extractJson(`{${content.slice(content.indexOf('"speech"'))}`));
+  if (!env2 && content.includes('"speech"')) {
+    raw = extractJson(`{${content.slice(content.indexOf('"speech"'))}`);
+    env2 = sanitizeEnvelope(raw);
+  }
   if (env2) {
     env2.source = 'llm';
+    const r = raw as Record<string, unknown>;
+    if (typeof r.search === 'string' && r.search.trim()) (env2 as LiveEnvelope).search = r.search.trim().slice(0, 200);
+    if (typeof r.weather === 'string') (env2 as LiveEnvelope).weather = r.weather.trim().slice(0, 60);
     return env2;
   }
   // Model replied in prose without a usable envelope — still give the user a voice line.
@@ -141,18 +154,47 @@ export async function askLLM(env: AgentEnv, text: string, timeoutMs = 18000, sce
   return { speech, build: null, source: 'llm_speech' };
 }
 
+/** LLM reply that asked the app for live info. */
+type LiveEnvelope = AgentEnvelope & { search?: string; weather?: string };
+
+/** Resolve a model's request for live info (weather / web search) into a spoken answer. */
+async function resolveLive(env: AgentEnv, e: LiveEnvelope, geo: Geo, text: string): Promise<AgentEnvelope> {
+  const { search, weather, ...rest } = e;
+  if (weather !== undefined) {
+    const w = await weatherAnswer(text, geo, weather || null);
+    return { ...w, source: `${e.source}+weather` };
+  }
+  if (search) {
+    if (!env.TAVILY_API_KEY) {
+      return { ...rest, build: null, lang: 'en', speech: "I can't look that up yet — web search isn't switched on.", source: `${e.source}+search(off)` };
+    }
+    const a = await webAnswer(env.TAVILY_API_KEY, search);
+    return a
+      ? { ...rest, build: null, lang: 'en', speech: a, source: `${e.source}+search` }
+      : { ...rest, build: null, lang: 'en', speech: "I couldn't find that online just now.", source: `${e.source}+search(miss)` };
+  }
+  return rest;
+}
+
 /** Decide what to do with one utterance. Never throws. */
-export async function decide(env: AgentEnv, text: string, scene = ''): Promise<AgentEnvelope> {
+export async function decide(env: AgentEnv, text: string, scene = '', geo: Geo = {}): Promise<AgentEnvelope> {
   const mode = (env.AGENT_MODE || 'hybrid').toLowerCase();
-  const rules = parseIntent(text);
   const done = (e: AgentEnvelope): AgentEnvelope => ({ ...e, transcript: text });
+  // live info that needs no model: weather and the clock
+  if (isWeatherQuestion(text)) return done(await weatherAnswer(text, geo));
+  if (isTimeQuestion(text)) return done(timeAnswer(geo));
+  const rules = parseIntent(text);
   if (mode === 'rules' || !env.LLM_API_KEY) return done(rules ?? fallbackEnvelope(text));
   // Hybrid: clear, recognised commands take the fast deterministic path (sub-100 ms);
   // anything open-ended goes to the model.
   if (mode === 'hybrid' && rules?.build) return done(rules);
   try {
     // open-ended build requests ("build me a dragon") go to the sculpt model when one is set
-    const wantsMaking = !rules?.build && /\b(build|make|create|sculpt|draw|construct|give me|i want|can you do)\b/i.test(text);
+    const wantsMaking =
+      !rules?.build &&
+      (/\b(build|make|create|sculpt|draw|construct|give me|i want|can you do)\b/i.test(text) ||
+        // a few other languages: es/pt/it/fr/de + zh/ja/km
+        /\b(construye|haz|crea|constr[óo]i|faça|fa[ií]|costruisci|construis|fais|cr[ée]e|baue?|mach)\b|建|做|造|作って|សង់|ធ្វើ/i.test(text));
     let llm: AgentEnvelope | null = null;
     if (wantsMaking) {
       // try the sculpt models in order; each gets a slice of the 30 s function budget
@@ -170,6 +212,8 @@ export async function decide(env: AgentEnv, text: string, scene = ''): Promise<A
     }
     if (!llm) llm = await askLLM(env, text, 20000, scene, undefined, 3000);
     if (llm) {
+      const l = llm as LiveEnvelope;
+      if (l.search || l.weather !== undefined) return done(await resolveLive(env, l, geo, text));
       if (!llm.build && rules?.build) return done({ ...rules, speech: llm.speech || rules.speech });
       return done(llm);
     }
@@ -183,6 +227,11 @@ export async function decide(env: AgentEnv, text: string, scene = ''): Promise<A
 
 /** AssemblyAI batch transcription of a short clip. */
 export async function transcribe(env: AgentEnv, audio: ArrayBuffer, timeoutMs = 15000): Promise<string> {
+  return (await transcribeLang(env, audio, timeoutMs)).text;
+}
+
+/** Transcribe with automatic language detection (English, Spanish, French, Hindi, Japanese, Chinese…). */
+export async function transcribeLang(env: AgentEnv, audio: ArrayBuffer, timeoutMs = 15000): Promise<{ text: string; lang?: string }> {
   const key = env.ASSEMBLYAI_API_KEY;
   if (!key) throw new Error('stt_unavailable');
   const t0 = Date.now();
@@ -197,7 +246,7 @@ export async function transcribe(env: AgentEnv, audio: ArrayBuffer, timeoutMs = 
   const job = await fetch('https://api.assemblyai.com/v2/transcript', {
     method: 'POST',
     headers: { authorization: key, 'content-type': 'application/json' },
-    body: JSON.stringify({ audio_url: upload_url, language_code: 'en', punctuate: true, format_text: true }),
+    body: JSON.stringify({ audio_url: upload_url, language_detection: true, punctuate: true, format_text: true }),
     signal: withTimeout(timeoutMs),
   });
   if (!job.ok) throw new Error(`stt job ${job.status}`);
@@ -205,16 +254,37 @@ export async function transcribe(env: AgentEnv, audio: ArrayBuffer, timeoutMs = 
   while (Date.now() - t0 < timeoutMs) {
     await new Promise((r) => setTimeout(r, 350));
     const r = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, { headers: { authorization: key } });
-    const j = (await r.json()) as { status: string; text?: string; error?: string };
-    if (j.status === 'completed') return (j.text ?? '').trim();
+    const j = (await r.json()) as { status: string; text?: string; error?: string; language_code?: string };
+    if (j.status === 'completed') return { text: (j.text ?? '').trim(), lang: j.language_code?.slice(0, 2) };
     if (j.status === 'error') throw new Error(`stt ${j.error}`);
   }
   throw new Error('stt timeout');
 }
 
+/**
+ * Male Kokoro voice per language. Languages missing here (French has no male Kokoro voice; Khmer,
+ * Thai, German, Korean… aren't in Kokoro) return no audio, and the headset speaks with its own voice.
+ */
+export const KOKORO_MALE: Record<string, string> = {
+  es: 'em_alex',
+  hi: 'hm_omega',
+  it: 'im_nicola',
+  ja: 'jm_kumo',
+  pt: 'pm_alex',
+  zh: 'zm_yunxi',
+};
+
+export function voiceFor(env: AgentEnv, lang?: string): string | null {
+  const l = (lang || 'en').slice(0, 2).toLowerCase();
+  if (l === 'en') return env.TTS_VOICE || 'am_adam';
+  return KOKORO_MALE[l] ?? null;
+}
+
 /** Optional OpenAI-compatible TTS (Kokoro-FastAPI etc). Male voice by default. */
-export async function synthesize(env: AgentEnv, text: string): Promise<{ mime: string; b64: string } | null> {
+export async function synthesize(env: AgentEnv, text: string, lang?: string): Promise<{ mime: string; b64: string } | null> {
   if (!env.TTS_BASE_URL || !text) return null;
+  const voice = voiceFor(env, lang);
+  if (!voice) return null;
   const base = env.TTS_BASE_URL.replace(/\/$/, '');
   const res = await fetch(`${base}/audio/speech`, {
     method: 'POST',
@@ -222,7 +292,7 @@ export async function synthesize(env: AgentEnv, text: string): Promise<{ mime: s
       'content-type': 'application/json',
       ...(env.TTS_API_KEY ? { authorization: `Bearer ${env.TTS_API_KEY}` } : {}),
     },
-    body: JSON.stringify({ model: 'kokoro', input: text, voice: env.TTS_VOICE || 'am_adam', response_format: 'mp3' }),
+    body: JSON.stringify({ model: 'kokoro', input: text, voice, response_format: 'mp3' }),
     signal: withTimeout(5000),
   });
   if (!res.ok) return null;

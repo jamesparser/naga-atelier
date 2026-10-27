@@ -31,7 +31,7 @@ export class Speaker {
     this.speaking = false;
   }
 
-  async speak(text: string, audio?: { mime: string; b64: string } | null): Promise<void> {
+  async speak(text: string, audio?: { mime: string; b64: string } | null, lang = 'en'): Promise<void> {
     if (this.muted || !text) return;
     this.stop();
     const ctx = this.getCtx();
@@ -62,11 +62,13 @@ export class Speaker {
     if (!('speechSynthesis' in window)) return;
     this.analyser = null;
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-US';
+    const l = (lang || 'en').toLowerCase();
+    u.lang = l === 'en' ? 'en-US' : (BCP47[l.slice(0, 2)] ?? l);
     u.rate = 1.04;
-    u.pitch = 0.9;
-    const v = pickMaleVoice();
+    const v = pickMaleVoice(l);
     if (v) u.voice = v;
+    // no clearly male voice for this language on the device: deepen the default one
+    u.pitch = v ? 0.9 : 0.6;
     this.speaking = true;
     await new Promise<void>((resolve) => {
       u.onend = () => resolve();
@@ -78,8 +80,15 @@ export class Speaker {
   }
 }
 
-const MALE_HINTS = /\b(male|david|daniel|alex|fred|guy|mark|george|james|tom|aaron|arthur|oliver|rishi|reed|eddy)\b/i;
-function pickMaleVoice(): SpeechSynthesisVoice | null {
-  const voices = speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith('en'));
+const BCP47: Record<string, string> = {
+  es: 'es-ES', fr: 'fr-FR', de: 'de-DE', it: 'it-IT', pt: 'pt-BR', ja: 'ja-JP', zh: 'zh-CN', ko: 'ko-KR',
+  hi: 'hi-IN', km: 'km-KH', th: 'th-TH', vi: 'vi-VN', ru: 'ru-RU', ar: 'ar-SA', id: 'id-ID', nl: 'nl-NL', tr: 'tr-TR',
+};
+/** Known male system voices across platforms (English + other languages). */
+const MALE_HINTS =
+  /\b(male|david|daniel|alex|fred|guy|mark|george|james|tom|aaron|arthur|oliver|rishi|reed|eddy|jorge|diego|juan|carlos|pablo|thomas|nicolas|henri|paul|luca|cosimo|diego|otoya|ichiro|keita|hattori|kangkang|yunxi|yunyang|liang|rocko|grandpa|hemant|prabhat|madhur|piseth|niwat|stefan|markus|conrad|yuri|pavel|felipe|reed)\b/i;
+function pickMaleVoice(lang = 'en'): SpeechSynthesisVoice | null {
+  const want = lang.slice(0, 2);
+  const voices = speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith(want));
   return voices.find((v) => MALE_HINTS.test(v.name) && !/female/i.test(v.name)) ?? null;
 }

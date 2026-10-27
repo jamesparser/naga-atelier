@@ -197,11 +197,11 @@ function start(): void {
   };
 
   // ------------------------------------------------------------- agent glue
-  const say = (text: string, audio?: AgentEnvelope['audio']) => {
+  const say = (text: string, audio?: AgentEnvelope['audio'], lang?: string) => {
     if (!text) return;
     naga.caption.say(text);
     naga.setMood('speaking');
-    void speaker.speak(text, audio).finally(() => {
+    void speaker.speak(text, audio, lang).finally(() => {
       if (naga.currentMood === 'speaking') naga.setMood('idle');
     });
   };
@@ -387,7 +387,7 @@ function start(): void {
       else if (mode === 'game') tetris.action(b.action === 'drop' ? 'drop' : b.action === 'retry' || b.action === 'next' ? 'drop' : 'pause');
       else if (mode === 'sling') sling.action(b.action === 'next' ? 'next' : 'retry');
       else speech = 'Say “play Tetris” or “slingshot” to start a game.';
-      say(speech, speech === env.speech ? env.audio : null);
+      say(speech, speech === env.speech ? env.audio : null, speech === env.speech ? env.lang : undefined);
       return;
     }
     if (mode === 'game' && b && (b.type === 'rotate' || b.type === 'move')) {
@@ -406,7 +406,7 @@ function start(): void {
         speech = offerMoreRoom(res.speech, speech);
       }
     }
-    say(speech, speech === env.speech ? env.audio : null);
+    say(speech, speech === env.speech ? env.audio : null, speech === env.speech ? env.lang : undefined);
     if (DEBUG) console.info('[agent]', env.source, env.transcript, env.build);
   };
 

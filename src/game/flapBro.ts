@@ -33,12 +33,15 @@ import { FLAPBRO_PAD } from '../ui/screenPad.js';
 import { GameBase, type GameHost, type PointerFrame } from './gameBase.js';
 
 export const FLAPBRO_NAME = 'Flap Bro';
-// tuned to be friendly: floaty gravity, small hops, wide gaps far apart
+// starts friendly (floaty gravity, small hops, wide gaps far apart) and tightens as you go
 const GRAVITY = -3.4;
 const FLAP_V = 1.45;
-const SPEED0 = 1.8;
+const SPEED0 = 1.6;
+const SPEED_MAX = 4.2;
 const SPACING = 4.2;
+const SPACING_MIN = 2.9;
 const GAP = 1.1;
+const GAP_MIN = 0.72;
 const WALL_W = 2.4, WALL_D = 0.35, WALL_H = 3;
 const FLOOR = -1.25, CEIL = 1.25;
 const FAR = -18;
@@ -52,6 +55,8 @@ interface Wall {
   gap: number;
   passed: boolean;
   hue: number;
+  /** this wall's opening height (shrinks as the run goes on) */
+  size: number;
 }
 
 export class FlapBro extends GameBase {
@@ -86,7 +91,7 @@ export class FlapBro extends GameBase {
     super(deskRoot, host, FLAPBRO_LAYOUT, FLAPBRO_PAD, 'naga-atelier:flapbro-best:v1', 'flapbro');
     this.root.add(this.world);
     this.wallMesh = new InstancedMesh(new BoxGeometry(WALL_W, WALL_H, WALL_D), new MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, emissive: 0x0a2a1a }), 24);
-    this.rimMesh = new InstancedMesh(new BoxGeometry(WALL_W + 0.08, 0.08, WALL_D + 0.08), new MeshBasicMaterial({ color: 0xffffff }), 24);
+    this.rimMesh = new InstancedMesh(new BoxGeometry(WALL_W + 0.08, 0.06, WALL_D + 0.08), new MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 24);
     for (const m of [this.wallMesh, this.rimMesh]) {
       m.frustumCulled = false;
       this.world.add(m);
@@ -178,12 +183,24 @@ export class FlapBro extends GameBase {
     this.state = 'ready';
   }
 
+  /** 0 at the start of a run → 1 when fully ramped (~40 walls / ~90 s) */
+  private get heat(): number {
+    const t = this.state === 'play' ? this.stateT : 0;
+    return Math.min(1, this.score / 40 + t / 180);
+  }
+
   private newWall(z: number): Wall {
+    const h = this.heat;
+    const size = GAP - (GAP - GAP_MIN) * h;
     const prev = this.walls[this.walls.length - 1]?.gap ?? 0;
-    const span = Math.min(0.45, 0.2 + this.score * 0.015); // next gap is never far from the last
+    const span = 0.2 + 0.45 * h; // next gap drifts further from the last as you warm up
     let gap = prev + (Math.random() * 2 - 1) * span;
-    gap = Math.max(FLOOR + GAP / 2 + 0.15, Math.min(CEIL - GAP / 2 - 0.15, gap));
-    return { z, gap, passed: false, hue: Math.random() };
+    gap = Math.max(FLOOR + size / 2 + 0.15, Math.min(CEIL - size / 2 - 0.15, gap));
+    return { z, gap, passed: false, hue: Math.random(), size };
+  }
+
+  private spacing(): number {
+    return SPACING - (SPACING - SPACING_MIN) * this.heat;
   }
 
   private flap(): void {
@@ -192,7 +209,10 @@ export class FlapBro extends GameBase {
       if (this.stateT < 0.8) return;
       this.reset();
     }
-    if (this.state === 'ready') this.state = 'play';
+    if (this.state === 'ready') {
+      this.state = 'play';
+      this.stateT = 0;
+    }
     this.vAlt = FLAP_V;
     this.flapT = 0;
     sfx.play('flap', 0.9 + Math.random() * 0.2);
@@ -256,12 +276,15 @@ export class FlapBro extends GameBase {
       this.vAlt += GRAVITY * dt;
       this.alt += this.vAlt * dt;
       if (this.alt > CEIL - 0.1) { this.alt = CEIL - 0.1; this.vAlt = Math.min(0, this.vAlt); }
-      this.speed = SPEED0 + Math.min(1.0, this.score * 0.04);
+      const was = this.speed;
+      this.speed = SPEED0 + (SPEED_MAX - SPEED0) * this.heat;
+      // call out each speed-up step so it never feels unfair
+      if (Math.floor(was * 2) < Math.floor(this.speed * 2) && this.speed > SPEED0 + 0.4) sfx.play('levelup');
       for (const w of this.walls) {
         const before = w.z;
         w.z += this.speed * dt;
         // crossing your eye plane: inside the gap or crash
-        if (before < WALL_D / 2 && w.z > -WALL_D / 2 && Math.abs(this.alt - w.gap) > GAP / 2 - 0.03) this.crash();
+        if (before < WALL_D / 2 && w.z > -WALL_D / 2 && Math.abs(this.alt - w.gap) > w.size / 2 - 0.03) this.crash();
         if (!w.passed && w.z > WALL_D / 2) {
           w.passed = true;
           this.score++;
@@ -272,7 +295,7 @@ export class FlapBro extends GameBase {
       }
       if (this.walls[0] && this.walls[0].z > 1.5) {
         this.walls.shift();
-        this.walls.push(this.newWall(this.walls[this.walls.length - 1].z - SPACING));
+        this.walls.push(this.newWall(this.walls[this.walls.length - 1].z - this.spacing()));
       }
       if (this.alt < FLOOR + 0.05) this.crash();
     } else if (this.state === 'ready') {
@@ -326,14 +349,20 @@ export class FlapBro extends GameBase {
     const comfort = this.view === 'comfort';
     for (const w of this.walls) {
       if (w.z < FAR) continue;
-      if (comfort && w.z > 0.25) continue; // once past your bird, a wall vanishes instead of sweeping through you
+      // walls grow in out of the distance and, once past your bird, fold away smoothly (no pop)
+      const grow = Math.min(1, (w.z - FAR) / 3);
+      const fold = comfort ? 1 - Math.min(1, Math.max(0, (w.z - 0.05) / 0.4)) : 1;
+      const k = Math.min(grow, fold);
+      if (k <= 0.01) continue;
       this.tmpC.setHSL((w.hue * 0.25 + 0.3) % 1, 0.65, 0.5);
       for (const top of [true, false]) {
-        const y = top ? w.gap + GAP / 2 + WALL_H / 2 : w.gap - GAP / 2 - WALL_H / 2;
-        this.tmpM.makeTranslation(0, y, w.z);
+        const sign = top ? 1 : -1;
+        const y = w.gap + sign * (w.size / 2 + WALL_H / 2);
+        this.tmpM.makeScale(k, 1, k).setPosition(0, y, w.z);
         this.wallMesh.setMatrixAt(n, this.tmpM);
         this.wallMesh.setColorAt(n, this.tmpC);
-        this.tmpM.makeTranslation(0, top ? w.gap + GAP / 2 + 0.04 : w.gap - GAP / 2 - 0.04, w.z);
+        // the bright lip sits just INSIDE the opening, not on the wall's face (that shimmered)
+        this.tmpM.makeScale(k, 1, k).setPosition(0, w.gap + sign * (w.size / 2 - 0.035), w.z);
         this.rimMesh.setMatrixAt(n, this.tmpM);
         this.rimMesh.setColorAt(n, this.tmpC.clone().offsetHSL(0, 0, 0.25));
         n++;

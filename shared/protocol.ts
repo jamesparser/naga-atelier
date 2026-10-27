@@ -188,6 +188,8 @@ export interface AgentEnvelope {
   audio?: { mime: string; b64: string } | null;
   /** Where the decision came from: "llm" | "rules" | "fallback". Debug only. */
   source?: string;
+  /** Language of `speech` (ISO 639-1, e.g. "en", "es", "km") so the voice matches. */
+  lang?: string;
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -300,6 +302,7 @@ export function sanitizeEnvelope(raw: unknown): AgentEnvelope | null {
   };
   if (typeof raw.transcript === 'string') env.transcript = raw.transcript.slice(0, 300);
   if (typeof raw.source === 'string') env.source = raw.source;
+  if (typeof raw.lang === 'string' && /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/.test(raw.lang)) env.lang = raw.lang.slice(0, 10);
   if (isObj(raw.audio) && typeof raw.audio.b64 === 'string' && typeof raw.audio.mime === 'string') {
     env.audio = { mime: raw.audio.mime, b64: raw.audio.b64 };
   }

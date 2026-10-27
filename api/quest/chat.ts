@@ -6,7 +6,8 @@
  *
  * Secrets stay server-side (Vercel env). The client bundle never contains keys.
  */
-import { DEFAULT_SCULPT_MODELS, decide, synthesize, transcribe, type AgentEnv } from '../../shared/agentCore.js';
+import { DEFAULT_SCULPT_MODELS, decide, synthesize, transcribeLang, type AgentEnv } from '../../shared/agentCore.js';
+import { geoFromHeaders } from '../../shared/live.js';
 
 export const config = { maxDuration: 30 };
 
@@ -64,6 +65,9 @@ export async function GET(req: Request): Promise<Response> {
       stt: !!env.ASSEMBLYAI_API_KEY,
       llm: !!env.LLM_API_KEY,
       tts: !!env.TTS_BASE_URL,
+      weather: true,
+      search: !!env.TAVILY_API_KEY,
+      languages: 'auto',
       llmModel: env.LLM_MODEL || null,
       sculptModel: env.SCULPT_MODEL || DEFAULT_SCULPT_MODELS[0],
       llmBase: env.LLM_BASE_URL || 'https://api.tokenfactory.nebius.com/v1',
@@ -79,6 +83,7 @@ export async function POST(req: Request): Promise<Response> {
 
   const type = (req.headers.get('content-type') ?? '').toLowerCase();
   let text = '';
+  let heardLang: string | undefined;
   let scene = '';
   try {
     scene = decodeURIComponent(req.headers.get('x-naga-scene') ?? '').slice(0, 600);
@@ -90,7 +95,9 @@ export async function POST(req: Request): Promise<Response> {
       const buf = await req.arrayBuffer();
       if (buf.byteLength === 0 || buf.byteLength > MAX_AUDIO) return json({ error: 'bad_audio' }, 413, req);
       if (!env.ASSEMBLYAI_API_KEY) return json({ error: 'stt_unavailable' }, 501, req);
-      text = await transcribe(env, buf);
+      const heard = await transcribeLang(env, buf);
+      text = heard.text;
+      heardLang = heard.lang;
       if (!text) return json({ speech: "Sorry, I didn't catch that.", build: null, transcript: '' }, 200, req);
     } else {
       const body = (await req.json().catch(() => null)) as { text?: unknown; scene?: unknown } | null;
@@ -102,7 +109,8 @@ export async function POST(req: Request): Promise<Response> {
     return json({ error: 'stt_failed', detail: String((e as Error).message).slice(0, 80) }, 502, req);
   }
 
-  const envelope = await decide(env, text, scene);
-  const audio = await synthesize(env, envelope.speech).catch(() => null);
+  const envelope = await decide(env, text, scene, geoFromHeaders(req.headers));
+  if (!envelope.lang && heardLang && heardLang !== 'en' && envelope.source?.startsWith('llm')) envelope.lang = heardLang;
+  const audio = await synthesize(env, envelope.speech, envelope.lang).catch(() => null);
   return json({ ...envelope, audio }, 200, req);
 }
