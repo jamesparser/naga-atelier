@@ -137,9 +137,21 @@ export function explicitSearch(text: string): string | null {
 
 /** Questions that obviously need fresh facts go straight to web search (no model round-trip). */
 const CURRENT_RE =
-  /\b(latest|news|headlines?|this week|today'?s|right now|currently|recent(ly)?|stock price|share price|price of|how much is .* (worth|trading)|exchange rate|score of|who won|election|released|announced)\b/i;
+  /\b(latest|news|headlines?|this week|today'?s|right now|currently|recent(ly)?|stock price|share price|price of|how much is .* (worth|trading)|exchange rate|score of|who won|election|released|announced|sports?|game score|nba|nfl|mlb|premier league|world cup|olympics?|breaking)\b/i;
 export function isCurrentQuestion(text: string): boolean {
   return CURRENT_RE.test(text) && !/\b(build|make|sculpt|create|draw|desk|block|grid|board|undo|save|load)\b/i.test(text);
+}
+
+/**
+ * Factual / informational questions that should go to Tavily when the model
+ * has no answer (or says it can't browse). Build/sculpt intents stay local.
+ */
+export function looksLikeFactQuestion(text: string): boolean {
+  const t = text.trim();
+  if (!t || /\b(build|make|sculpt|create|draw|place|put|clear|undo|redo|export|save|tetris|sling|palette|grid)\b/i.test(t)) return false;
+  if (isCurrentQuestion(t) || isWeatherQuestion(t) || isTimeQuestion(t)) return true;
+  // who/what/when/where/why/how + question-ish
+  return /^(who|what|when|where|why|how|is|are|was|were|does|do|did|can|could|tell me|explain|define|define)\b/i.test(t) || /\?\s*$/.test(t);
 }
 
 /** All configured Tavily keys, in order: TAVILY_API_KEY (may be comma-separated), then TAVILY_API_KEY_2. */

@@ -4,7 +4,7 @@
  */
 import { BLUEPRINT_IDS, PALETTE_NAMES, sanitizeEnvelope, type AgentEnvelope } from './protocol.js';
 import { fallbackEnvelope, parseIntent } from './intent.js';
-import { explicitSearch, isCurrentQuestion, isTimeQuestion, isWeatherQuestion, tavilyKeys, timeAnswer, weatherAnswer, webAnswerAny, type Geo } from './live.js';
+import { explicitSearch, isCurrentQuestion, isTimeQuestion, isWeatherQuestion, looksLikeFactQuestion, tavilyKeys, timeAnswer, weatherAnswer, webAnswerAny, type Geo } from './live.js';
 
 export interface AgentEnv {
   LLM_BASE_URL?: string;
@@ -218,8 +218,12 @@ export async function decide(env: AgentEnv, text: string, scene = '', geo: Geo =
     if (llm) {
       const l = llm as LiveEnvelope;
       if (l.search || l.weather !== undefined) return done(await resolveLive(env, l, geo, text));
-      // safety net: the model said it can't browse — search the question instead of giving up
-      if (!llm.build && tavilyKeys(env).length && /(real[- ]?time|internet|browse|live data|up[- ]to[- ]date|current (info|data)|don'?t have access|can'?t access|knowledge cutoff)/i.test(llm.speech))
+      // safety net: model can't browse / doesn't know → Tavily instead of guessing
+      const weak =
+        /(real[- ]?time|internet|browse|live data|up[- ]to[- ]date|current (info|data)|don'?t have access|can'?t access|knowledge cutoff|as an ai|i don'?t know|i do not know|i'?m not sure|i am not sure|i can'?t (answer|say|provide|look)|no (idea|information)|unsure|cannot (find|answer|provide)|don'?t have (that|this|the) (info|information|data))/i.test(
+          llm.speech,
+        );
+      if (!llm.build && tavilyKeys(env).length && (weak || looksLikeFactQuestion(text)))
         return done(await resolveLive(env, { ...llm, search: text }, geo, text));
       if (!llm.build && rules?.build) return done({ ...rules, speech: llm.speech || rules.speech });
       return done(llm);
