@@ -130,6 +130,17 @@ export function nextGridPreset(): GridPreset {
   return applyGridPreset(GRID_PRESETS[(i + 1) % GRID_PRESETS.length].id);
 }
 
+/** Pick a preset without mutating live grid constants (safe before a reload). */
+export function peekGridPreset(id: GridPresetId | string): GridPreset {
+  return GRID_PRESETS.find((p) => p.id === id) ?? GRID_PRESETS[1];
+}
+
+/** Cycle target without applying it. */
+export function peekNextGridPreset(): GridPreset {
+  const i = GRID_PRESETS.findIndex((p) => p.id === GRID_PRESET_ID);
+  return GRID_PRESETS[(i + 1) % GRID_PRESETS.length];
+}
+
 /** Desk placement relative to the seated head pose at session start. */
 export const DESK_FORWARD = 0.5;
 export const DESK_BELOW_HEAD = 0.45;

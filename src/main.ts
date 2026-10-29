@@ -24,7 +24,7 @@ import {
   TOUCH,
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { DEBUG, DESK_BELOW_HEAD, DESK_FORWARD, LOW_FX, QUERY, CELL, GRID_PRESETS, GRID_PRESET_ID, applyGridPreset, nextGridPreset } from './config.js';
+import { DEBUG, DESK_BELOW_HEAD, DESK_FORWARD, LOW_FX, QUERY, CELL, GRID_PRESETS, GRID_PRESET_ID, peekGridPreset, peekNextGridPreset } from './config.js';
 import { sanitizeCommand, BLUEPRINT_IDS, type AgentEnvelope, type BuildCommand, type BlueprintId, type PaletteName } from '../shared/protocol.js';
 import { VoxelModel, key } from './blocks/voxelModel.js';
 import { VoxelRenderer } from './blocks/voxelRenderer.js';
@@ -154,6 +154,8 @@ function start(): void {
     u.searchParams.delete('regrid');
     history.replaceState(null, '', u.toString());
   }
+  /** Live XR session (set in onSessionStarted) — grid switch must end it before reload. */
+  let activeXrSession: XRSession | null = null;
   /** Save now and reload on another block size, keeping the build. */
   const switchGrid = (id: string) => {
     try {
@@ -171,7 +173,18 @@ function start(): void {
     url.searchParams.set('grid', id);
     url.searchParams.delete('fresh');
     url.searchParams.set('regrid', '1');
-    location.assign(url.toString());
+    // Leaving immersive XR first: location.assign can hang inside a session.
+    const go = () => location.assign(url.toString());
+    const sess = activeXrSession ?? (navigator as unknown as { xr?: { getSession?: () => XRSession | null } }).xr?.getSession?.() ?? null;
+    if (sess) {
+      activeXrSession = null;
+      void sess
+        .end()
+        .catch(() => undefined)
+        .finally(() => setTimeout(go, 80));
+    } else {
+      setTimeout(go, 50);
+    }
   };
   let saveTimer = 0;
   model.on((e) => {
@@ -314,11 +327,11 @@ function start(): void {
       const i = GRID_PRESETS.findIndex((p) => p.id === GRID_PRESET_ID);
       const rel = cmd.preset === 'finer' ? GRID_PRESETS[Math.min(GRID_PRESETS.length - 1, i + 1)] : cmd.preset === 'coarser' ? GRID_PRESETS[Math.max(0, i - 1)] : null;
       if (rel && rel.id === GRID_PRESET_ID) return { ok: false, speech: cmd.preset === 'finer' ? 'This is already the finest grid.' : 'This is already the biggest block size.' };
-      const next = rel ? applyGridPreset(rel.id) : cmd.preset ? applyGridPreset(cmd.preset) : nextGridPreset();
+      // Peek only — mutating CELL/GRID_* before reload desyncs the live scene and can freeze.
+      const next = rel ? peekGridPreset(rel.id) : cmd.preset ? peekGridPreset(cmd.preset) : peekNextGridPreset();
       sfx.play('chime');
-      // Block geometry / desk size are built at session start: reload, and the build comes along.
       const line = `${next.label}. Bringing your build along…`;
-      setTimeout(() => switchGrid(next.id), 900);
+      setTimeout(() => switchGrid(next.id), 250);
       return { ok: true, speech: line, answer: true };
     }
     const res = executeCommand(model, cmd);
@@ -760,6 +773,7 @@ function start(): void {
 
   const onSessionStarted = async (s: XRSession) => {
     session = s;
+    activeXrSession = s;
     sfx.unlock();
     const passthrough = xrMode === 'immersive-ar';
     scene.background = passthrough ? null : bg;
@@ -775,6 +789,7 @@ function start(): void {
     s.addEventListener('selectstart', () => sfx.unlock());
     s.addEventListener('end', () => {
       session = null;
+      activeXrSession = null;
       setTimeout(() => showLegend(mode), 0);
       voice.stop();
       speaker.stop();
