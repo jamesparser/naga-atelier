@@ -256,4 +256,128 @@ function level12(): LevelDef {
   return { id: 12, name: 'Citadel', birds: ['pebble', 'pebble', 'boulder', 'pebble', 'boulder', 'pebble'], blocks, targets, stars: [70000, 100000] };
 }
 
-export const LEVELS: LevelDef[] = [level1(), level2(), level3(), level4(), level5(), level6(), level7(), level8(), level9(), level10(), level11(), level12()];
+function level13(): LevelDef {
+  // twin glass towers with a wooden bridge
+  const blocks: BlockDef[] = [];
+  const targets: TargetDef[] = [];
+  for (const x of [-1.1, 1.1]) {
+    const t = room('glass', 'wood', x, 0, -1.9, 0.7, 1.2);
+    blocks.push(...t.blocks);
+    targets.push(T(x, 0, -1.9, 0.16), T(x, t.top, -1.9, 0.14));
+  }
+  blocks.push(B('wood', 0, 1.36, -1.9, 1.6, 0.14, 0.5));
+  targets.push(T(0, 1.5, -1.9, 0.14));
+  return { id: 13, name: 'Twin glass', birds: ['pebble', 'pebble', 'boulder'], blocks, targets, stars: [38000, 56000] };
+}
+
+function level14(): LevelDef {
+  // zig-zag wall of wood, targets tucked in the pockets
+  const blocks: BlockDef[] = [];
+  const targets: TargetDef[] = [];
+  for (let i = 0; i < 5; i++) {
+    const x = -1.4 + i * 0.7;
+    const z = -1.2 - i * 0.25;
+    blocks.push(B('wood', x, 0, z, 0.28, 1.1, 0.7));
+    if (i % 2 === 0) {
+      blocks.push(B('glass', x, 1.1, z, 0.5, 0.12, 0.5));
+      targets.push(T(x, 1.22, z, 0.14));
+    } else targets.push(T(x, 0, z + 0.5, 0.14));
+  }
+  return { id: 14, name: 'Zigzag', birds: ['pebble', 'pebble', 'pebble', 'boulder'], blocks, targets, stars: [36000, 54000] };
+}
+
+function level15(): LevelDef {
+  // stacked rooms, target on the roof of the stack
+  const blocks: BlockDef[] = [];
+  const r1 = room('stone', 'wood', 0, 0, -1.8, 1.1, 0.55);
+  const r2 = room('wood', 'glass', 0, r1.top, -1.8, 0.9, 0.5);
+  const r3 = room('glass', 'wood', 0, r2.top, -1.8, 0.7, 0.45);
+  blocks.push(...r1.blocks, ...r2.blocks, ...r3.blocks);
+  return {
+    id: 15, name: 'Stack', birds: ['pebble', 'boulder', 'pebble', 'pebble'],
+    blocks,
+    targets: [T(0, 0, -1.8, 0.18), T(0, r1.top, -1.8, 0.15), T(0, r2.top, -1.8, 0.14), T(0, r3.top, -1.8, 0.13)],
+    stars: [42000, 62000],
+  };
+}
+
+function level16(): LevelDef {
+  // three arches in a row (same stable pattern as level 3)
+  const blocks: BlockDef[] = [];
+  const targets: TargetDef[] = [];
+  for (const x of [-1.3, 0, 1.3]) {
+    const a = arch('stone', x, 0, -1.9, 0.85, 0.7, 0.3);
+    blocks.push(...a.blocks);
+    targets.push(T(x, 0, -1.9, 0.18), T(x, a.top, -1.9, 0.14));
+  }
+  return { id: 16, name: 'Colonnade', birds: ['pebble', 'boulder', 'pebble', 'boulder'], blocks, targets, stars: [40000, 60000] };
+}
+
+function level17(): LevelDef {
+  // glass greenhouse with a wooden frame
+  const blocks: BlockDef[] = [];
+  for (const [x, z] of [[-0.9, -1.4], [0.9, -1.4], [-0.9, -2.3], [0.9, -2.3]]) {
+    blocks.push(B('wood', x, 0, z, 0.22, 1.0, 0.22));
+  }
+  blocks.push(B('glass', 0, 1.0, -1.85, 2.0, 0.12, 1.1));
+  blocks.push(B('glass', -0.9, 0, -1.85, 0.12, 1.0, 1.1), B('glass', 0.9, 0, -1.85, 0.12, 1.0, 1.1));
+  return {
+    id: 17, name: 'Greenhouse',
+    birds: ['pebble', 'pebble', 'pebble', 'pebble'],
+    blocks,
+    targets: [T(0, 0, -1.85, 0.18), T(-0.55, 0, -1.85, 0.15), T(0.55, 0, -1.85, 0.15), T(0, 1.12, -1.85, 0.14)],
+    stars: [34000, 50000],
+  };
+}
+
+function level18(): LevelDef {
+  // two stacked rooms + side posts (level 5 / 15 style)
+  const blocks: BlockDef[] = [];
+  const r1 = room('stone', 'wood', 0, 0, -1.9, 1.2, 0.55);
+  const r2 = room('wood', 'glass', 0, r1.top, -1.9, 0.95, 0.5);
+  blocks.push(...r1.blocks, ...r2.blocks);
+  blocks.push(B('stone', -1.5, 0, -1.9, 0.4, 0.8, 0.4), B('stone', 1.5, 0, -1.9, 0.4, 0.8, 0.4));
+  return {
+    id: 18, name: 'Ziggurat', birds: ['boulder', 'pebble', 'pebble', 'boulder'],
+    blocks,
+    targets: [T(0, 0, -1.9, 0.18), T(0, r1.top, -1.9, 0.15), T(0, r2.top, -1.9, 0.13), T(-1.5, 0.8, -1.9, 0.13), T(1.5, 0.8, -1.9, 0.13)],
+    stars: [36000, 54000],
+  };
+}
+
+function level19(): LevelDef {
+  // outer posts + one small keep on the ground (no intersecting walls)
+  const blocks: BlockDef[] = [];
+  const targets: TargetDef[] = [];
+  for (const x of [-1.7, 1.7]) {
+    blocks.push(B('stone', x, 0, -1.9, 0.5, 1.2, 0.5));
+    targets.push(T(x, 1.2, -1.9, 0.14));
+    targets.push(T(x, 0, -1.35, 0.13));
+  }
+  const keep = room('wood', 'glass', 0, 0, -1.9, 1.0, 0.85);
+  blocks.push(...keep.blocks);
+  targets.push(T(0, 0, -1.9, 0.16), T(0, keep.top, -1.9, 0.13));
+  return { id: 19, name: 'Keep', birds: ['boulder', 'pebble', 'boulder', 'pebble', 'pebble'], blocks, targets, stars: [42000, 62000] };
+}
+
+function level20(): LevelDef {
+  // final gauntlet: three arches + one stacked room (all proven-stable patterns)
+  const blocks: BlockDef[] = [];
+  const targets: TargetDef[] = [];
+  for (const x of [-1.45, 1.45]) {
+    const a = arch('stone', x, 0, -1.7, 0.8, 0.65, 0.3);
+    blocks.push(...a.blocks);
+    targets.push(T(x, 0, -1.7, 0.16), T(x, a.top, -1.7, 0.13));
+  }
+  const r1 = room('wood', 'glass', 0, 0, -2.2, 1.15, 0.7);
+  blocks.push(...r1.blocks);
+  const r2 = room('glass', 'wood', 0, r1.top, -2.2, 0.85, 0.5);
+  blocks.push(...r2.blocks);
+  targets.push(T(0, 0, -2.2, 0.18), T(0, r1.top, -2.2, 0.14), T(0, r2.top, -2.2, 0.12));
+  return { id: 20, name: 'Final gauntlet', birds: ['boulder', 'pebble', 'boulder', 'pebble', 'boulder', 'pebble'], blocks, targets, stars: [50000, 75000] };
+}
+
+export const LEVELS: LevelDef[] = [
+  level1(), level2(), level3(), level4(), level5(), level6(), level7(), level8(), level9(), level10(),
+  level11(), level12(), level13(), level14(), level15(), level16(), level17(), level18(), level19(), level20(),
+];

@@ -9,3 +9,7 @@ dist
 test-results
 coverage
 .env*
+video-raw/
+video-out/
+*.mp4
+!src/**/*.mp4

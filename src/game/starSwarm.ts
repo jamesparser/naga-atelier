@@ -50,15 +50,23 @@ interface Alien {
   /** boss escorts dive once and are gone */
   escort?: boolean;
 }
-type PowerKind = 'double' | 'rapid' | 'shield' | 'bomb' | 'life';
+type PowerKind = 'double' | 'triple' | 'rapid' | 'speed' | 'shield' | 'bomb' | 'life';
 interface Power {
   kind: PowerKind;
   pos: Vector3;
   spin: number;
 }
-const POWER_COLOR: Record<PowerKind, number> = { double: 0x5cff8a, rapid: 0xffa040, shield: 0x4fb4ff, bomb: 0xffe14a, life: 0xff6fd8 };
-const POWER_NAME: Record<PowerKind, string> = { double: 'Twin guns', rapid: 'Rapid fire', shield: 'Shield', bomb: 'Smart bomb', life: 'Extra ship' };
-const POWER_WEIGHTS: Array<[PowerKind, number]> = [['double', 30], ['rapid', 30], ['shield', 20], ['bomb', 12], ['life', 8]];
+const POWER_COLOR: Record<PowerKind, number> = {
+  double: 0x5cff8a, triple: 0x7dff5c, rapid: 0xffa040, speed: 0xffe14a,
+  shield: 0x4fb4ff, bomb: 0xff5fd2, life: 0xff6fd8,
+};
+const POWER_NAME: Record<PowerKind, string> = {
+  double: 'Twin guns', triple: 'Triple shot', rapid: 'Rapid fire', speed: 'Speed boost',
+  shield: 'Shield', bomb: 'Smart bomb', life: 'Extra ship',
+};
+const POWER_WEIGHTS: Array<[PowerKind, number]> = [
+  ['double', 22], ['triple', 18], ['rapid', 22], ['speed', 18], ['shield', 10], ['bomb', 6], ['life', 4],
+];
 interface Boss {
   hp: number;
   max: number;
@@ -106,7 +114,9 @@ export class StarSwarm extends GameBase {
   private shieldMesh: Mesh;
   private shield = false;
   private doubleT = 0;
+  private tripleT = 0;
   private rapidT = 0;
+  private speedT = 0;
   private tmpCol = new Color();
   /** power-ups caught this game (stats / tests) */
   private caught: PowerKind[] = [];
@@ -201,7 +211,7 @@ export class StarSwarm extends GameBase {
     this.lives = 3;
     this.score = 0;
     this.shield = false;
-    this.doubleT = this.rapidT = 0;
+    this.doubleT = this.tripleT = this.rapidT = this.speedT = 0;
     this.powers = [];
     this.caught = [];
     this.boss = null;
@@ -262,8 +272,10 @@ export class StarSwarm extends GameBase {
     sfx.play('chime');
     this.sparkles.burst(p.pos, POWER_COLOR[p.kind], 20, 0.3);
     switch (p.kind) {
-      case 'double': this.doubleT = 14; break;
-      case 'rapid': this.rapidT = 12; break;
+      case 'double': this.doubleT = 18; break;
+      case 'triple': this.tripleT = 18; break;
+      case 'rapid': this.rapidT = 16; break;
+      case 'speed': this.speedT = 16; break;
       case 'shield': this.shield = true; break;
       case 'life': this.lives++; break;
       case 'bomb': {
@@ -318,8 +330,9 @@ export class StarSwarm extends GameBase {
     b.flash -= dt;
     const home = new Vector3(Math.sin(b.t * 0.7) * 0.13, 0.27 + Math.sin(b.t * 1.3) * 0.035, FORMATION_Z - 0.02 + Math.sin(b.t * 0.5) * 0.04);
     if (b.entering) {
-      b.pos.lerp(home, Math.min(1, dt * 1.5));
-      if (b.pos.distanceTo(home) < 0.02) b.entering = false;
+      b.pos.lerp(home, Math.min(1, dt * 2.2));
+      // clear once close OR after a short beat — never leave the boss invulnerable
+      if (b.pos.distanceTo(home) < 0.06 || b.t > 2.5) b.entering = false;
       return;
     }
     const angry = b.hp < b.max / 2;
@@ -411,33 +424,39 @@ export class StarSwarm extends GameBase {
   }
 
   private fire(): void {
-    const rapid = this.rapidT > 0, twin = this.doubleT > 0;
-    if ((this.state !== 'play' && this.state !== 'boss') || this.fireCd > 0 || this.shots.length >= (rapid || twin ? 14 : 5)) return;
-    this.fireCd = rapid ? 0.085 : 0.2;
-    for (const dx of twin ? [-0.014, 0.014] : [0]) {
+    const rapid = this.rapidT > 0, twin = this.doubleT > 0, triple = this.tripleT > 0;
+    const multi = twin || triple;
+    if ((this.state !== 'play' && this.state !== 'boss') || this.fireCd > 0 || this.shots.length >= (multi || rapid ? 18 : 6)) return;
+    this.fireCd = rapid ? 0.07 : 0.18;
+    // offsets: single / twin / triple (triple fans slightly)
+    const offsets: Array<[number, number]> = triple
+      ? [[-0.018, 0.08], [0, 0], [0.018, -0.08]]
+      : twin
+        ? [[-0.014, 0], [0.014, 0]]
+        : [[0, 0]];
+    for (const [dx, wy] of offsets) {
       const from = this.shipPos.clone().add(new Vector3(dx, 0, -0.03));
-      const vel = new Vector3(0, 0, -0.9);
-      // aim assist (height only): lines up with the nearest alien (or the boss) in your column, so
-      // steering left/right is enough on a keyboard, and hands don't need perfect height
+      const vel = new Vector3(wy, 0, -1.05);
+      // aim assist (height only)
       let best: Vector3 | null = null;
       for (const a of this.aliens) {
-        if (!a.alive || a.pos.z > from.z - 0.02 || Math.abs(a.pos.x - from.x) > 0.03) continue;
+        if (!a.alive || a.pos.z > from.z - 0.02 || Math.abs(a.pos.x - from.x) > 0.035) continue;
         if (!best || a.pos.z > best.z) best = a.pos;
       }
-      if (!best && this.boss && Math.abs(this.boss.pos.x - from.x) < 0.07) best = this.boss.pos;
-      if (best) vel.y = ((best.y - from.y) / (from.z - best.z)) * 0.9;
+      if (!best && this.boss && Math.abs(this.boss.pos.x - from.x) < 0.09) best = this.boss.pos;
+      if (best && !wy) vel.y = ((best.y - from.y) / (from.z - best.z)) * 1.05;
       this.shots.push({ pos: from, vel });
     }
-    sfx.play('laser', (rapid ? 1.2 : 0.9) + Math.random() * 0.2);
+    sfx.play('laser', (rapid ? 1.25 : 0.95) + Math.random() * 0.15);
   }
 
   protected tick(frames: PointerFrame[], now: number, dt: number): void {
     // --- input ----------------------------------------------------------------
     this.firing = this.held.has('fire');
-    if (this.held.has('left')) this.nudge(-dt * 6, 0);
-    if (this.held.has('right')) this.nudge(dt * 6, 0);
-    if (this.held.has('up')) this.nudge(0, dt * 6);
-    if (this.held.has('down')) this.nudge(0, -dt * 6);
+    if (this.held.has('left')) this.nudge(-dt * (this.speedT > 0 ? 9 : 6), 0);
+    if (this.held.has('right')) this.nudge(dt * (this.speedT > 0 ? 9 : 6), 0);
+    if (this.held.has('up')) this.nudge(0, dt * (this.speedT > 0 ? 9 : 6));
+    if (this.held.has('down')) this.nudge(0, -dt * (this.speedT > 0 ? 9 : 6));
     for (const f of frames) {
       const p = f.p;
       if (p.gamepad) {
@@ -470,7 +489,9 @@ export class StarSwarm extends GameBase {
     this.fireCd -= dt;
     this.invuln -= dt;
     this.doubleT -= dt;
+    this.tripleT -= dt;
     this.rapidT -= dt;
+    this.speedT -= dt;
     if (this.firing) this.fire();
     this.shipPos.lerp(this.target, Math.min(1, dt * 14));
 
@@ -551,12 +572,13 @@ export class StarSwarm extends GameBase {
           break;
         }
       }
-      // shots vs boss
-      if (this.boss && !this.boss.entering) {
+      // shots vs boss (also allowed while it is still flying in)
+      if (this.boss) {
+        const hitR = this.boss.entering ? 0.09 : 0.075;
         for (const s of this.shots) {
-          if (s.pos.distanceTo(this.boss.pos) > 0.06) continue;
+          if (s.pos.distanceTo(this.boss.pos) > hitR) continue;
           s.pos.z = -9;
-          this.sparkles.burst(s.pos.clone().setZ(this.boss.pos.z + 0.04), 0xffffff, 4, 0.15);
+          this.sparkles.burst(s.pos.clone().setZ(this.boss.pos.z + 0.04), 0xffffff, 5, 0.18);
           this.damageBoss(1);
           if (!this.boss) break;
         }
